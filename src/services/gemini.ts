@@ -7,7 +7,7 @@ export interface PoemAnalysis {
 }
 
 export async function analyzePoem(poem: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
 
   const response = await ai.models.generateContent({
@@ -55,11 +55,11 @@ export async function analyzePoem(poem: string, styleName: string, stylePrompt: 
 }
 
 export async function generateImage(prompt: string, modelType: 'free' | 'paid'): Promise<string> {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
 
   const modelName = modelType === 'paid' ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
-  
+
   // Force no text and Chinese elements in the image prompt
   const finalPrompt = `STRICT NEGATIVE CONSTRAINTS (CRITICAL):
   - ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO CHARACTERS, NO WRITING, NO ALPHABET.

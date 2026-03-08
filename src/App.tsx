@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings, X, History } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings, X, History, Music, VolumeX, Volume2 } from 'lucide-react';
 import CanvasOverlay from './components/CanvasOverlay';
 import { analyzePoem, generateImage, PoemAnalysis } from './services/gemini';
 
@@ -13,16 +13,16 @@ const POEMS = [
   { title: "问刘十九", author: "白居易", dynasty: "唐", content: "绿蚁新醅酒，红泥小火炉。晚来天欲雪，能饮一杯无？" },
   { title: "夜雪", author: "白居易", dynasty: "唐", content: "已讶衾枕冷，复见窗户明。夜深知雪重，时闻折竹声。" },
   { title: "遗爱寺", author: "白居易", dynasty: "唐", content: "弄石临溪坐，寻花绕寺行。时时闻鸟语，处处是泉声。" },
-  { title: "忆江南", author: "白居易", dynasty: "唐", content: "忆江南·江南好江南好，风景旧曾谙。日出江花红胜火，春来江水绿如蓝。能不忆江南？" },
+  { title: "忆江南", author: "白居易", dynasty: "唐", content: "江南好，风景旧曾谙。日出江花红胜火，春来江水绿如蓝。能不忆江南？" },
   { title: "春夜喜雨", author: "杜甫", dynasty: "唐", content: "好雨知时节，当春乃发生。随风潜入夜，润物细无声。野径云俱黑，江船火独明。晓看红湿处，花重锦官城。" },
   { title: "江南逢李龟年", author: "杜甫", dynasty: "唐", content: "岐王宅里寻常见，崔九堂前几度闻。正是江南好风景，落花时节又逢君。" },
-  { title: "江畔独步寻花其五", author: "杜甫", dynasty: "唐", content: "江畔独步寻花其五黄师塔前江水东，春光懒困倚微风。桃花一簇开无主，可爱深红爱浅红？" },
-  { title: "江畔独步寻花其六", author: "杜甫", dynasty: "唐", content: "江畔独步寻花其六黄四娘家花满蹊，千朵万朵压枝低。留连戏蝶时时舞，自在娇莺恰恰啼。" },
-  { title: "绝句", author: "一", dynasty: "唐", content: "绝句二首迟日江山丽，春风花草香。泥融飞燕子，沙暖睡鸳鸯。" },
+  { title: "江畔独步寻花其五", author: "杜甫", dynasty: "唐", content: "黄师塔前江水东，春光懒困倚微风。桃花一簇开无主，可爱深红爱浅红？" },
+  { title: "江畔独步寻花其六", author: "杜甫", dynasty: "唐", content: "黄四娘家花满蹊，千朵万朵压枝低。留连戏蝶时时舞，自在娇莺恰恰啼。" },
+  { title: "绝句", author: "一", dynasty: "唐", content: "迟日江山丽，春风花草香。泥融飞燕子，沙暖睡鸳鸯。" },
   { title: "绝句", author: "二", dynasty: "唐", content: "江碧鸟逾白，山青花欲燃。今春看又过，何日是归年。" },
-  { title: "前出塞其六", author: "杜甫", dynasty: " 唐 ", content: "前出塞·其六挽弓当挽强，用箭当用长。射人先射马，擒贼先擒王。杀人亦有限，列国自有疆。苟能制侵陵，岂在多杀伤。" },
-  { title: "水槛遣心二首", author: "杜甫", dynasty: " 唐 ", content: "其一去郭轩楹敞，无村眺望赊。澄江平少岸，幽树晚多花。细雨鱼儿出，微风燕子斜。城中十万户，此地两三家。蜀天常夜雨，江槛已朝晴。叶润林塘密，衣干枕席清。不堪祗老病，何得尚浮名。浅把涓涓酒，深凭送此生。" },
-  { title: "望岳", author: "杜甫", dynasty: "唐", content: "岱宗夫如何，齐鲁青未了。造化钟神秀，阴阳割昏晓。荡胸生曾云，决眦入归鸟。冉冉升起的云霞荡涤我的心灵，会当凌绝顶，一览众山小。" },
+  { title: "前出塞其六", author: "杜甫", dynasty: " 唐 ", content: "挽弓当挽强，用箭当用长。射人先射马，擒贼先擒王。杀人亦有限，列国自有疆。苟能制侵陵，岂在多杀伤。" },
+  { title: "水槛遣心二首", author: "杜甫", dynasty: " 唐 ", content: "去郭轩楹敞，无村眺望赊。澄江平少岸，幽树晚多花。细雨鱼儿出，微风燕子斜。城中十万户，此地两三家。蜀天常夜雨，江槛已朝晴。叶润林塘密，衣干枕席清。不堪祗老病，何得尚浮名。浅把涓涓酒，深凭送此生。" },
+  { title: "望岳", author: "杜甫", dynasty: "唐", content: "岱宗夫如何，齐鲁青未了。造化钟神秀，阴阳割昏晓。荡胸生曾云，决眦入归鸟。会当凌绝顶，一览众山小。" },
   { title: "十五夜望月寄杜郎中", author: "王建", dynasty: "唐", content: "中庭地白树栖鸦，冷露无声湿桂花。今夜月明人尽望，不知秋思落谁家。" },
   { title: "闻官军收河南河北", author: "杜甫", dynasty: "唐", content: "剑外忽传收蓟北，初闻涕泪满衣裳。却看妻子愁何在，漫卷诗书喜欲狂。白日放歌须纵酒，青春作伴好还乡。即从巴峡穿巫峡，便下襄阳向洛阳。" },
   { title: "赠花卿", author: "杜甫", dynasty: " 唐 ", content: "锦城丝管日纷纷，半入江风半入云。此曲只应天上有，人间能得几回闻。" },
@@ -32,35 +32,35 @@ const POEMS = [
   { title: "将进酒", author: "李白", dynasty: "唐", content: "君不见，黄河之水天上来，奔流到海不复回。君不见，高堂明镜悲白发，朝如青丝暮成雪。人生得意须尽欢，莫使金樽空对月。天生我材必有用，千金散尽还复来。烹羊宰牛且为乐，会须一饮三百杯。岑夫子，丹丘生，将进酒，杯莫停。与君歌一曲，请君为我倾耳听。钟鼓馔玉不足贵，但愿长醉不愿醒。古来圣贤皆寂寞，惟有饮者留其名。陈王昔时宴平乐，斗酒十千恣欢谑。主人何为言少钱，径须沽取对君酌。五花马，千金裘，呼儿将出换美酒，与尔同销万古愁。" },
   { title: "静夜思", author: "李白", dynasty: "唐", content: "床前明月光，疑是地上霜。举头望明月，低头思故乡。" },
   { title: "客中作", author: "李白", dynasty: " 唐 ", content: "兰陵美酒郁金香，玉碗盛来琥珀光。但使主人能醉客，不知何处是他乡。" },
-  { title: "秋浦歌其十五", author: "李白", dynasty: "唐", content: "秋浦歌·十五白发三千丈，缘愁似个长。不知明镜里，何处得秋霜。" },
+  { title: "秋浦歌其十五", author: "李白", dynasty: "唐", content: "白发三千丈，缘愁似个长。不知明镜里，何处得秋霜。" },
   { title: "望庐山瀑布", author: "李白", dynasty: "唐", content: "日照香炉生紫烟，遥看瀑布挂前川。飞流直下三千尺，疑是银河落九天。" },
   { title: "望天门山", author: "李白", dynasty: "唐", content: "天门中断楚江开，碧水东流至此回。两岸青山相对出，孤帆一片日边来。" },
   { title: "夜宿山寺", author: "李白", dynasty: "唐", content: "危楼高百尺，手可摘星辰。不敢高声语，恐惊天上人。" },
   { title: "早发白帝城", author: "李白", dynasty: "唐", content: "朝辞白帝彩云间，千里江陵一日还。两岸猿声啼不住，轻舟已过万重山。" },
-  { title: "赠汪伦", author: "李白", dynasty: "唐", content: "桃花潭水深千尺，不及汪伦送我情。" },
-  { title: "子夜吴歌.秋歌", author: "李白", dynasty: "唐", content: "子夜吴歌·秋歌长安一片月，万户捣衣声。秋风吹不尽，总是玉关情。何日平胡虏，良人罢远征。" },
-  { title: "浪淘沙九首", author: "刘禹锡", dynasty: "唐", content: "其一九曲黄河万里沙，浪淘风簸自天涯。如今直上银河去，同到牵牛织女家。其二洛水桥边春日斜，碧流轻浅见琼砂。无端陌上狂风疾，惊起鸳鸯出浪花。其三汴水东流虎眼文，清淮晓色鸭头春。君看渡口淘沙处，渡却人间多少人。其四鹦鹉洲头浪飐沙，青楼春望日将斜。衔泥燕子争归舍，独自狂夫不忆家。其五濯锦江边两岸花，春风吹浪正淘沙。女郎剪下鸳鸯锦，将向中流匹晚霞。其六日照澄洲江雾开，淘金女伴满江隈。美人首饰侯王印，尽是沙中浪底来。其七八月涛声吼地来，头高数丈触山回。须臾却入海门去，卷起沙堆似雪堆。其八莫道谗言如浪深，莫言迁客似沙沉。千淘万漉虽辛苦，吹尽狂沙始到金。其九流水淘沙不暂停，前波未灭后波生。令人忽忆潇湘渚，回唱迎神三两声。" },
+  { title: "赠汪伦", author: "李白", dynasty: "唐", content: "李白乘舟将欲行，忽闻岸上踏歌声。桃花潭水深千尺，不及汪伦送我情。" },
+  { title: "子夜吴歌.秋歌", author: "李白", dynasty: "唐", content: "长安一片月，万户捣衣声。秋风吹不尽，总是玉关情。何日平胡虏，良人罢远征。" },
+  { title: "浪淘沙", author: "刘禹锡", dynasty: "唐", content: "九曲黄河万里沙，浪淘风簸自天涯。如今直上银河去，同到牵牛织女家。" },
   { title: "望洞庭", author: "刘禹锡", dynasty: "唐", content: "湖光秋月两相和，潭面无风镜未磨。遥望洞庭山水翠，白银盘里一青螺。" },
   { title: "冬夜读书示子聿", author: "陆游", dynasty: " 宋 ", content: "古人学问无遗力，少壮工夫老始成。纸上得来终觉浅，绝知此事要躬行。" },
-  { title: "秋夜将晓出篱门迎凉有感二首", author: "陆游", dynasty: "宋", content: "其一迢迢天汉西南落，喔喔邻鸡一再鸣。壮志病来消欲尽，出门搔首怆平生。其二三万里河东入海，五千仞岳上摩天。遗民泪尽胡尘里，南望王师又一年。" },
+  { title: "秋夜将晓出篱门迎凉有感", author: "陆游", dynasty: "宋", content: "三万里河东入海，五千仞岳上摩天。遗民泪尽胡尘里，南望王师又一年。" },
   { title: "示儿", author: "陆游", dynasty: "宋", content: "死去元知万事空，但悲不见九州同。王师北定中原日，家祭无忘告乃翁。" },
   { title: "咏鹅", author: "骆宾王", dynasty: "唐", content: "鹅，鹅，鹅，曲项向天歌。白毛浮绿水，红掌拨清波。" },
-  { title: "于易水送人", author: "骆宾王", dynasty: " 唐 ", content: "于易水送人/于易水送别此地别燕丹，壮士发冲冠。昔时人已没，今日水犹寒。" },
-  { title: "沁园春.雪", author: "毛泽东", dynasty: "近", content: "沁园春·雪北国风光，千里冰封，万里雪飘。望长城内外，惟余莽莽；大河上下，顿失滔滔。山舞银蛇，原驰蜡象，欲与天公试比高。须晴日，看红装素裹，分外妖娆。的冰雪交相辉映，分外美好。江山如此多娇，引无数英雄竞折腰。惜秦皇汉武，略输文采；唐宗宋祖，稍逊风骚。一代天骄，成吉思汗，只识弯弓射大雕。俱往矣，数风流人物，还看今朝。" },
-  { title: "沁园春.长沙", author: "毛泽东", dynasty: "现", content: "沁园春·长沙独立寒秋，湘江北去，橘子洲头。看万山红遍，层林尽染；漫江碧透，百舸争流。鹰击长空，鱼翔浅底，万类霜天竞自由。怅寥廓，问苍茫大地，谁主沉浮？携来百侣曾游，忆往昔峥嵘岁月稠。恰同学少年，风华正茂；书生意气，挥斥方遒指点江山，激扬文字，粪土当年万户侯。曾记否，到中流击水，浪遏飞舟？" },
+  { title: "于易水送人", author: "骆宾王", dynasty: " 唐 ", content: "此地别燕丹，壮士发冲冠。昔时人已没，今日水犹寒。" },
+  { title: "沁园春.雪", author: "毛泽东", dynasty: "近", content: "北国风光，千里冰封，万里雪飘。望长城内外，惟余莽莽；大河上下，顿失滔滔。山舞银蛇，原驰蜡象，欲与天公试比高。须晴日，看红装素裹，分外妖娆。的冰雪交相辉映，分外美好。江山如此多娇，引无数英雄竞折腰。惜秦皇汉武，略输文采；唐宗宋祖，稍逊风骚。一代天骄，成吉思汗，只识弯弓射大雕。俱往矣，数风流人物，还看今朝。" },
+  { title: "沁园春.长沙", author: "毛泽东", dynasty: "现", content: "独立寒秋，湘江北去，橘子洲头。看万山红遍，层林尽染；漫江碧透，百舸争流。鹰击长空，鱼翔浅底，万类霜天竞自由。怅寥廓，问苍茫大地，谁主沉浮？携来百侣曾游，忆往昔峥嵘岁月稠。恰同学少年，风华正茂；书生意气，挥斥方遒指点江山，激扬文字，粪土当年万户侯。曾记否，到中流击水，浪遏飞舟？" },
   { title: "春晓", author: "孟浩然", dynasty: "唐", content: "春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。" },
   { title: "宿建德江", author: "孟浩然", dynasty: "唐", content: "移舟泊烟渚，日暮客愁新。野旷天低树，江清月近人。" },
   { title: "登鹳雀楼", author: "王之涣", dynasty: "唐", content: "白日依山尽，黄河入海流。欲穷千里目，更上一层楼。" },
-  { title: "凉州词二首", author: "王之涣", dynasty: "唐", content: "其一黄河远上白云间，一片孤城万仞山。羌笛何须怨杨柳，春风不度玉门关。其二单于北望拂云堆，杀马登坛祭几回。汉家天子今神武，不肯和亲归去来。" },
+  { title: "凉州词", author: "王之涣", dynasty: "唐", content: "黄河远上白云间，一片孤城万仞山。羌笛何须怨杨柳，春风不度玉门关。" },
   { title: "过分水岭", author: "温庭筠", dynasty: " 唐 ", content: "溪水无情似有情，入山三日得同行。岭头便是分头处，惜别潺湲一夜声。" },
   { title: "商山早行", author: "温庭筠", dynasty: "唐", content: "晨起动征铎，客行悲故乡。鸡声茅店月，人迹板桥霜。槲叶落山路，枳花明驿墙。因思杜陵梦，凫雁满回塘。" },
-  { title: "菩萨蛮.书江西造口壁", author: "辛弃疾", dynasty: " 宋 ", content: "菩萨蛮·书江西造口壁郁孤台下清江水，中间多少行人泪。西北望长安，可怜无数山。青山遮不住，毕竟东流去。江晚正愁余①，山深闻鹧鸪。" },
-  { title: "清平乐.村居", author: "辛弃疾", dynasty: "宋", content: "清平乐·村居茅檐低小，溪上青青草。醉里吴音相媚好，白发谁家翁媪？大儿锄豆溪东，中儿正织鸡笼。最喜小儿亡赖，溪头卧剥莲蓬。" },
+  { title: "菩萨蛮.书江西造口壁", author: "辛弃疾", dynasty: " 宋 ", content: "郁孤台下清江水，中间多少行人泪。西北望长安，可怜无数山。青山遮不住，毕竟东流去。江晚正愁余①，山深闻鹧鸪。" },
+  { title: "清平乐.村居", author: "辛弃疾", dynasty: "宋", content: "茅檐低小，溪上青青草。醉里吴音相媚好，白发谁家翁媪？大儿锄豆溪东，中儿正织鸡笼。最喜小儿亡赖，溪头卧剥莲蓬。" },
   { title: "初秋行圃", author: "杨万里", dynasty: " 宋 ", content: "落日无情最有情，遍催万树暮蝉鸣。听来咫尺无寻处，寻到旁边却不声。初秋在园子里散步" },
   { title: "过松源晨炊漆公店", author: "杨万里", dynasty: "宋", content: "莫言下岭便无难，赚得行人错喜欢。政入万山围子里，一山放出一山拦。" },
   { title: "小池", author: "杨万里", dynasty: "宋", content: "泉眼无声惜细流，树阴照水爱晴柔。小荷才露尖尖角，早有蜻蜓立上头。" },
-  { title: "晓出净慈寺送林子方二首", author: "杨万里", dynasty: "宋", content: "其一出得西湖月尚残，荷花荡里柳行间。红香世界清凉国，行了南山却北山。毕竟西湖六月中，风光不与四时同。接天莲叶无穷碧，映日荷花别样红。" },
-  { title: "西江月.夜行黄沙道中", author: "辛弃疾", dynasty: "宋", content: "西江月·夜行黄沙道中明月别枝惊鹊，清风半夜鸣蝉。稻花香里说丰年，听取蛙声一片。七八个星天外，两三点雨山前。旧时茅店社林边，路转溪桥忽见。" },
+  { title: "晓出净慈寺送林子方", author: "杨万里", dynasty: "宋", content: "毕竟西湖六月中，风光不与四时同。接天莲叶无穷碧，映日荷花别样红。" },
+  { title: "西江月.夜行黄沙道中", author: "辛弃疾", dynasty: "宋", content: "明月别枝惊鹊，清风半夜鸣蝉。稻花香里说丰年，听取蛙声一片。七八个星天外，两三点雨山前。旧时茅店社林边，路转溪桥忽见。" },
   { title: "新柳", author: "杨万里", dynasty: " 宋 ", content: "柳条百尺拂银塘，且莫深青只浅黄。未必柳条能蘸水，水中柳影引他长。" },
   { title: "宿新市徐公店", author: "杨万里", dynasty: "宋", content: "篱落疏疏一径深，树头新绿未成阴。儿童急走追黄蝶，飞入菜花无处寻。" },
   { title: "稚子弄冰", author: "杨万里", dynasty: "宋", content: "稚子金盆脱晓冰，彩丝穿取当银钲。敲成玉磬穿林响，忽作玻璃碎地声。" },
@@ -69,31 +69,31 @@ const POEMS = [
   { title: "所见", author: "袁枚", dynasty: "清", content: "牧童骑黄牛，歌声振林樾。意欲捕鸣蝉，忽然闭口立。" },
   { title: "苔", author: "袁枚", dynasty: " 清 ", content: "白日不到处，青春恰自来。苔花如米小，也学牡丹开。" },
   { title: "春日", author: "朱熹", dynasty: "宋", content: "胜日寻芳泗水滨，无边光景一时新。等闲识得东风面，万紫千红总是春。" },
-  { title: "观书有感其一", author: "朱熹", dynasty: "宋", content: "观书有感二首·其一半亩方塘一鉴开，天光云影共徘徊。问渠那得清如许，为有源头活水来。" },
-  { title: "天净沙.春", author: "白朴", dynasty: " 元 ", content: "天净沙·春春山暖日和风，阑干楼阁帘栊，杨柳秋千院中。啼莺舞燕，小桥流水飞红。" },
+  { title: "观书有感其一", author: "朱熹", dynasty: "宋", content: "半亩方塘一鉴开，天光云影共徘徊。问渠那得清如许，为有源头活水来。" },
+  { title: "天净沙.春", author: "白朴", dynasty: " 元 ", content: "春山暖日和风，阑干楼阁帘栊，杨柳秋千院中。啼莺舞燕，小桥流水飞红。" },
   { title: "敕勒歌", author: "北朝民歌", dynasty: "南北朝", content: "敕勒川，阴山下。天似穹庐，笼盖四野。天苍苍，野茫茫。风吹草低见牛羊。" },
-  { title: "七步诗", author: "曹植", dynasty: "未知", content: "版本一煮豆燃豆萁，豆在釜中泣。本是同根生，相煎何太急？版本二煮豆持作羹，漉菽以为汁。萁在釜下燃，豆在釜中泣。本自同根生，相煎何太急？" },
+  { title: "七步诗", author: "曹植", dynasty: "未知", content: "煮豆燃豆萁，豆在釜中泣。本是同根生，相煎何太急？" },
   { title: "三衢道中", author: "曾几", dynasty: "宋", content: "梅子黄时日日晴，小溪泛尽却山行。绿阴不减来时路，添得黄鹂四五声。" },
   { title: "舟夜书所见", author: "查慎行", dynasty: "清", content: "月黑见渔灯，孤光一点萤。微微风簇浪，散作满河星。" },
   { title: "一字诗", author: "陈沆", dynasty: " 清 ", content: "一帆一桨一渔舟，一个渔翁一钓钩。一俯一仰一场笑，一江明月一江秋。" },
-  { title: "溪上遇雨其二", author: "崔道融", dynasty: " 唐 ", content: "溪上遇雨其二坐看黑云衔猛雨，喷洒前山此独晴。忽惊云雨在头上，却是山前晚照明。" },
+  { title: "溪上遇雨其二", author: "崔道融", dynasty: " 唐 ", content: "坐看黑云衔猛雨，喷洒前山此独晴。忽惊云雨在头上，却是山前晚照明。" },
   { title: "乌衣巷", author: "刘禹锡", dynasty: "唐", content: "朱雀桥边野草花，乌衣巷口夕阳斜。旧时王谢堂前燕，飞入寻常百姓家。" },
-  { title: "竹枝词其一", author: "刘禹锡", dynasty: "唐", content: "竹枝词·其一杨柳青青江水平，闻郎江上唱歌声。东边日出西边雨，道是无晴却有晴。" },
+  { title: "竹枝词其一", author: "刘禹锡", dynasty: "唐", content: "杨柳青青江水平，闻郎江上唱歌声。东边日出西边雨，道是无晴却有晴。" },
   { title: "海棠", author: "苏轼", dynasty: " 宋 ", content: "东风袅袅泛崇光，香雾空蒙月转廊。只恐夜深花睡去，故烧高烛照红妆。" },
-  { title: "惠崇春江晚景其一", author: "苏轼", dynasty: "宋", content: "惠崇春江晚景二首其一竹外桃花三两枝，春江水暖鸭先知。蒌蒿满地芦芽短，正是河豚欲上时。" },
-  { title: "惠崇春江晚景其二", author: "苏轼", dynasty: "宋", content: "惠崇春江晚景二首其二两两归鸿欲破群，依依还似北归人。遥知朔漠多风雪，更待江南半月春。" },
-  { title: "六月二十七日望湖楼醉书五首", author: "苏轼", dynasty: "宋", content: "六月二十七日望湖楼醉书其一黑云翻墨未遮山，白雨跳珠乱入船。卷地风来忽吹散，望湖楼下水如天。一阵狂风平地而来，将暴雨都吹散。放生鱼鳖逐人来，无主荷花到处开。水枕能令山俯仰，风船解与月裴回。乌菱白芡不论钱，乱系青菰裹绿盘。忽忆尝新会灵观，滞留江海得加餐。献花游女木兰桡，细雨斜风湿翠翘。无限芳洲生杜若，吴儿不识楚辞招。未成小隐聊中隐，可得长闲胜暂闲。我本无家更安往，故乡无此好湖山。" },
+  { title: "惠崇春江晚景其一", author: "苏轼", dynasty: "宋", content: "竹外桃花三两枝，春江水暖鸭先知。蒌蒿满地芦芽短，正是河豚欲上时。" },
+  { title: "惠崇春江晚景其二", author: "苏轼", dynasty: "宋", content: "两两归鸿欲破群，依依还似北归人。遥知朔漠多风雪，更待江南半月春。" },
+  { title: "六月二十七日望湖楼醉书", author: "苏轼", dynasty: "宋", content: "黑云翻墨未遮山，白雨跳珠乱入船。卷地风来忽吹散，望湖楼下水如天。" },
   { title: "题西林壁", author: "苏轼", dynasty: "宋", content: "横看成岭侧成峰，远近高低各不同。不识庐山真面目，只缘身在此山中。" },
-  { title: "饮湖上初晴后雨二首", author: "苏轼", dynasty: "宋", content: "其一朝曦迎客艳重冈，晚雨留人入醉乡。此意自佳君不会，一杯当属水仙王。其二水光潋滟晴方好，山色空蒙雨亦奇。欲把西湖比西子，淡妆浓抹总相宜。" },
+  { title: "饮湖上初晴后雨", author: "苏轼", dynasty: "宋", content: "水光潋滟晴方好，山色空蒙雨亦奇。欲把西湖比西子，淡妆浓抹总相宜。" },
   { title: "北陂杏花", author: "王安石", dynasty: " 宋 ", content: "一陂春水绕花身，花影妖娆各占春。纵被春风吹作雪，绝胜南陌碾成尘。" },
   { title: "泊船瓜洲", author: "王安石", dynasty: "未知", content: "京口瓜洲一水间，钟山只隔数重山。春风又绿江南岸，明月何时照我还。" },
   { title: "梅花", author: "王安石", dynasty: "宋", content: "墙角数枝梅，凌寒独自开。遥知不是雪，为有暗香来。" },
   { title: "书湖阴先生壁", author: "王安石", dynasty: "未知", content: "茅檐长扫净无苔，花木成畦手自栽。一水护田将绿绕，两山排闼送青来。" },
   { title: "元日", author: "王安石", dynasty: "宋", content: "爆竹声中一岁除，春风送暖入屠苏。千门万户曈曈日，总把新桃换旧符。" },
-  { title: "采莲曲二首", author: "王昌龄", dynasty: "唐", content: "其一吴姬越艳楚王妃，争弄莲舟水湿衣。来时浦口花迎入，采罢江头月送归。荷叶罗裙一色裁，芙蓉向脸两边开。乱入池中看不见，闻歌始觉有人来。" },
-  { title: "出塞二首", author: "王昌龄", dynasty: "唐", content: "其一秦时明月汉时关，万里长征人未还。但使龙城飞将在，不教胡马度阴山。其二骝马新跨白玉鞍，战罢沙场月色寒。城头铁鼓声犹振，匣里金刀血未干。" },
-  { title: "从军行其四", author: "王昌龄", dynasty: "唐", content: "从军行其四青海长云暗雪山，孤城遥望玉门关。黄沙百战穿金甲，不破楼兰终不还。" },
-  { title: "芙蓉楼送辛渐二首", author: "王昌龄", dynasty: "唐", content: "其一寒雨连江夜入吴，平明送客楚山孤。洛阳亲友如相问，一片冰心在玉壶。其二丹阳城南秋海阴，丹阳城北楚云深。高楼送客不能醉，寂寂寒江明月心。" },
+  { title: "采莲曲", author: "王昌龄", dynasty: "唐", content: "荷叶罗裙一色裁，芙蓉向脸两边开。乱入池中看不见，闻歌始觉有人来。" },
+  { title: "出塞", author: "王昌龄", dynasty: "唐", content: "秦时明月汉时关，万里长征人未还。但使龙城飞将在，不教胡马度阴山。" },
+  { title: "从军行其四", author: "王昌龄", dynasty: "唐", content: "青海长云暗雪山，孤城遥望玉门关。黄沙百战穿金甲，不破楼兰终不还。" },
+  { title: "芙蓉楼送辛渐", author: "王昌龄", dynasty: "唐", content: "寒雨连江夜入吴，平明送客楚山孤。洛阳亲友如相问，一片冰心在玉壶。" },
   { title: "画", author: "王维", dynasty: "唐", content: "远看山有色，近听水无声。春去花还在，人来鸟不惊。" },
   { title: "九月九日忆山东兄弟", author: "王维", dynasty: "唐", content: "独在异乡为异客，每逢佳节倍思亲。遥知兄弟登高处，遍插茱萸少一人。" },
   { title: "鹿柴", author: "王维", dynasty: "唐", content: "空山不见人，但闻人语响。返景入深林，复照青苔上。" },
@@ -111,16 +111,16 @@ const POEMS = [
   { title: "秋夕", author: "杜牧", dynasty: "唐", content: "银烛秋光冷画屏，轻罗小扇扑流萤。天阶夜色凉如水，卧看牵牛织女星。" },
   { title: "山行", author: "杜牧", dynasty: "唐", content: "远上寒山石径斜，白云生处有人家。停车坐爱枫林晚，霜叶红于二月花。" },
   { title: "江上渔者", author: "范仲淹", dynasty: "宋", content: "江上往来人，但爱鲈鱼美。君看一叶舟，出没风波里。" },
-  { title: "晚春二首其一", author: "韩愈", dynasty: "唐", content: "晚春二首·其一草树知春不久归，百般红紫斗芳菲。杨花榆荚无才思，惟解漫天作雪飞。" },
-  { title: "晚春二首其二", author: "韩愈", dynasty: "未知", content: "晚春二首·其二谁收春色将归去，慢绿妖红半不存。榆荚只能随柳絮，等闲撩乱走空园。" },
-  { title: "早春呈水部张十八员外二首", author: "韩愈", dynasty: "唐", content: "其一天街小雨润如酥，草色遥看近却无。最是一年春好处，绝胜烟柳满皇都。莫道官忙身老大，即无年少逐春心。凭君先到江头看，柳色如今深未深。" },
+  { title: "晚春二首其一", author: "韩愈", dynasty: "唐", content: "草树知春不久归，百般红紫斗芳菲。杨花榆荚无才思，惟解漫天作雪飞。" },
+  { title: "晚春二首其二", author: "韩愈", dynasty: "未知", content: "谁收春色将归去，慢绿妖红半不存。榆荚只能随柳絮，等闲撩乱走空园。" },
+  { title: "早春呈水部张十八员外", author: "韩愈", dynasty: "唐", content: "天街小雨润如酥，草色遥看近却无。最是一年春好处，绝胜烟柳满皇都。" },
   { title: "江南", author: "汉乐府", dynasty: "未知", content: "江南可采莲，莲叶何田田，鱼戏莲叶间。鱼戏莲叶东，鱼戏莲叶西，鱼戏莲叶南，鱼戏莲叶北。" },
-  { title: "四时田园杂兴其二十五，其三十一", author: "范成大", dynasty: "宋", content: "四时田园杂兴·其二十五梅子金黄杏子肥，麦花雪白菜花稀。日长篱落无人过，惟有蜻蜓蛱蝶飞。四时田园杂兴·其三十一昼出耘田夜绩麻，村庄儿女各当家。童孙未解供耕织，也傍桑阴学种瓜。" },
+  { title: "四时田园杂兴其二十五", author: "范成大", dynasty: "宋", content: "梅子金黄杏子肥，麦花雪白菜花稀。日长篱落无人过，惟有蜻蜓蛱蝶飞。" },
   { title: "村居", author: "高鼎", dynasty: "清", content: "草长莺飞二月天，拂堤杨柳醉春烟。儿童散学归来早，忙趁东风放纸鸢。" },
   { title: "山亭夏日", author: "高骈", dynasty: " 唐 ", content: "绿树阴浓夏日长，楼台倒影入池塘。水晶帘动微风起，满架蔷薇一院香。" },
-  { title: "别董大二首", author: "高适", dynasty: "唐", content: "其一千里黄云白日曛，北风吹雁雪纷纷。莫愁前路无知己，天下谁人不识君。其二六翮飘飖私自怜，一离京洛十余年。丈夫贫贱应未足，今日相逢无酒钱。" },
-  { title: "己亥杂诗", author: "龚自珍", dynasty: "清", content: "其一百二十五九州生气恃风雷，万马齐喑究可哀。我劝天公重抖擞，不拘一格降人材。其五浩荡离愁白日斜，吟鞭东指即天涯。落红不是无情物，化作春泥更护花。" },
-  { title: "晚春江晴寄友人", author: "韩琮", dynasty: " 唐 ", content: "晚春江晴寄友人/晚春别晚日低霞绮，晴山远画眉。春青河畔草，不是望乡时。" },
+  { title: "别董大", author: "高适", dynasty: "唐", content: "千里黄云白日曛，北风吹雁雪纷纷。莫愁前路无知己，天下谁人不识君。" },
+  { title: "己亥杂诗", author: "龚自珍", dynasty: "清", content: "九州生气恃风雷，万马齐喑究可哀。我劝天公重抖擞，不拘一格降人材。" },
+  { title: "晚春江晴寄友人", author: "韩琮", dynasty: " 唐 ", content: "晚日低霞绮，晴山远画眉。春青河畔草，不是望乡时。" },
   { title: "寒食", author: "韩翃", dynasty: "唐", content: "春城无处不飞花，寒食东风御柳斜。日暮汉宫传蜡烛，轻烟散入五侯家。" },
   { title: "小儿垂钓", author: "胡令能", dynasty: "唐", content: "蓬头稚子学垂纶，侧坐莓苔草映身。路人借问遥招手，怕得鱼惊不应人。" },
   { title: "咏华山", author: "寇准", dynasty: " 宋 ", content: "只有天在上，更无山与齐。举头红日近，回首白云低。" },
@@ -142,48 +142,48 @@ const POEMS = [
   { title: "狱中题壁", author: "谭嗣同", dynasty: " 清 ", content: "望门投止思张俭，忍死须臾待杜根。我自横刀向天笑，去留肝胆两昆仑。" },
   { title: "画鸡", author: "唐寅", dynasty: "明", content: "头上红冠不用裁，满身雪白走将来。平生不敢轻言语，一叫千门万户开。" },
   { title: "送杜少府之任蜀州", author: "王勃", dynasty: "唐", content: "城阙辅三秦，风烟望五津。与君离别意，同是宦游人。海内存知己，天涯若比邻。无为在歧路，儿女共沾巾。" },
-  { title: "凉州词二首", author: "王翰", dynasty: "唐", content: "凉táng州词wáng二首其一葡萄美酒夜光杯，欲饮琵琶马上催。醉卧沙场君莫笑，古来征战几人回。其二秦中花鸟已应阑，jiào塞外风沙犹自寒。夜听胡笳折杨柳，教人意气忆长安。" },
-  { title: "送春", author: "王令", dynasty: " 宋 ", content: "送春/春晚三月残花落更开，小檐日日燕飞来。子规夜半犹啼血，不信东风唤不回。" },
+  { title: "凉州词", author: "王翰", dynasty: "唐", content: "葡萄美酒夜光杯，欲饮琵琶马上催。醉卧沙场君莫笑，古来征战几人回。" },
+  { title: "送春", author: "王令", dynasty: " 宋 ", content: "春晚三月残花落更开，小檐日日燕飞来。子规夜半犹啼血，不信东风唤不回。" },
   { title: "墨梅", author: "王冕", dynasty: "元", content: "我家洗砚池头树，朵朵花开淡墨痕。不要人夸好颜色，只留清气满乾坤。" },
-  { title: "朝天子.咏喇叭", author: "王磐", dynasty: "明", content: "朝天子·咏喇叭喇叭，唢呐，曲儿小腔儿大。官船来往乱如麻，全仗你抬声价。军听了军愁，民听了民怕。哪里去辨甚么真共假？眼见的吹翻了这家，吹伤了那家，只吹的水尽鹅飞罢！直吹得水流干鹅飞跑，家破人亡啊！" },
+  { title: "朝天子.咏喇叭", author: "王磐", dynasty: "明", content: "喇叭，唢呐，曲儿小腔儿大。官船来往乱如麻，全仗你抬声价。军听了军愁，民听了民怕。哪里去辨甚么真共假？眼见的吹翻了这家，吹伤了那家，只吹的水尽鹅飞罢！直吹得水流干鹅飞跑，家破人亡啊！" },
   { title: "滁州西涧", author: "韦应物", dynasty: "唐", content: "独怜幽草涧边生，上有黄鹂深树鸣。春潮带雨晚来急，野渡无人舟自横。" },
   { title: "乡村四月", author: "翁卷", dynasty: "宋", content: "绿遍山原白满川，子规声里雨如烟。乡村四月闲人少，才了蚕桑又插田。" },
   { title: "山中杂诗", author: "吴均", dynasty: "未知", content: "山际见来烟，竹中窥落日。鸟向檐上飞，云从窗里出。" },
   { title: "石灰吟", author: "于谦", dynasty: "明", content: "千锤万凿出深山，烈火焚烧若等闲。粉骨碎身浑不怕，要留清白在人间。" },
   { title: "江南", author: "汉乐府", dynasty: "未知", content: "江南可采莲，莲叶何田田，鱼戏莲叶间。鱼戏莲叶东，鱼戏莲叶西，鱼戏莲叶南，鱼戏莲叶北。" },
   { title: "长歌行", author: "汉乐府", dynasty: "未知", content: "青青园中葵，朝露待日晞。阳春布德泽，万物生光辉。常恐秋节至，焜黄华叶衰。百川东到海，何时复西归?少壮不努力，老大徒伤悲。" },
-  { title: "回乡偶书二首", author: "贺知章", dynasty: "唐", content: "其一少小离家老大回，乡音无改鬓毛衰。儿童相见不相识，笑问客从何处来。其二离别家乡岁月多，近来人事半消磨。唯有门前镜湖水，春风不改旧时波。" },
+  { title: "回乡偶书", author: "贺知章", dynasty: "唐", content: "少小离家老大回，乡音无改鬓毛衰。儿童相见不相识，笑问客从何处来。" },
   { title: "咏柳", author: "贺知章", dynasty: "唐", content: "碧玉妆成一树高，万条垂下绿丝绦。不知细叶谁裁出，二月春风似剪刀。" },
   { title: "题诗后", author: "贾岛", dynasty: " 唐 ", content: "两句三年得，一吟双泪流。知音如不赏，归卧故山秋。" },
   { title: "寻隐者不遇", author: "贾岛", dynasty: "唐", content: "松下问童子，言师采药去。只在此山中，云深不知处。" },
-  { title: "马诗其五", author: "李贺", dynasty: "未知", content: "马诗其五大漠沙如雪，燕山月似钩。何当金络脑，快走踏清秋。" },
-  { title: "南园十三首其五", author: "李贺", dynasty: " 唐 ", content: "南园十三首·其五男儿何不带吴钩，收取关山五十州。请君暂上凌烟阁，若个书生万户侯？" },
-  { title: "悯农其一", author: "李绅", dynasty: "唐", content: "悯农二首其一春种一粒粟，秋收万颗子。四海无闲田，农夫犹饿死。" },
-  { title: "悯农其二", author: "李绅", dynasty: "唐", content: "悯农二首其二锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦？" },
-  { title: "和张仆射塞下曲其二", author: "卢纶", dynasty: "唐", content: "和张仆射塞下曲六首其二林暗草惊风，将军夜引弓。平明寻白羽，没在石棱中。" },
-  { title: "和张仆射塞下曲其三", author: "卢纶", dynasty: "唐", content: "和张仆射塞下曲六首其三月黑雁飞高，单于夜遁逃。欲将轻骑逐，大雪满弓刀。" },
+  { title: "马诗其五", author: "李贺", dynasty: "未知", content: "大漠沙如雪，燕山月似钩。何当金络脑，快走踏清秋。" },
+  { title: "南园十三首其五", author: "李贺", dynasty: " 唐 ", content: "男儿何不带吴钩，收取关山五十州。请君暂上凌烟阁，若个书生万户侯？" },
+  { title: "悯农其一", author: "李绅", dynasty: "唐", content: "春种一粒粟，秋收万颗子。四海无闲田，农夫犹饿死。" },
+  { title: "悯农其二", author: "李绅", dynasty: "唐", content: "锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦？" },
+  { title: "和张仆射塞下曲其二", author: "卢纶", dynasty: "唐", content: "林暗草惊风，将军夜引弓。平明寻白羽，没在石棱中。" },
+  { title: "和张仆射塞下曲其三", author: "卢纶", dynasty: "唐", content: "月黑雁飞高，单于夜遁逃。欲将轻骑逐，大雪满弓刀。" },
   { title: "春游湖", author: "徐俯", dynasty: " 宋 ", content: "双飞燕子几时回？夹岸桃花蘸水开。春雨断桥人不渡，小舟撑出柳阴来。" },
   { title: "劝学", author: "颜真卿", dynasty: "唐", content: "三更灯火五更鸡，正是男儿读书时。黑发不知勤学早，白首方悔读书迟。" },
-  { title: "惠崇春江晚景二首", author: "苏轼", dynasty: "宋", content: "其一竹外桃花三两枝，春江水暖鸭先知。蒌蒿满地芦芽短，正是河豚欲上时。其二两两归鸿欲破群，依依还似北归人。遥知朔漠多风雪，更待江南半月春。" },
-  { title: "长相思", author: "纳兰性德", dynasty: "清", content: "长相思·山一程山一程，水一程，身向榆关那畔行，夜深千帐灯。风一更，雪一更，聒碎乡心梦不成，故园无此声。" },
+  { title: "惠崇春江晚景", author: "苏轼", dynasty: "宋", content: "竹外桃花三两枝，春江水暖鸭先知。蒌蒿满地芦芽短，正是河豚欲上时。" },
+  { title: "长相思", author: "纳兰性德", dynasty: "清", content: "山一程，水一程，身向榆关那畔行，夜深千帐灯。风一更，雪一更，聒碎乡心梦不成，故园无此声。" },
   { title: "送元二使安西", author: "王维", dynasty: "唐", content: "渭城朝雨浥轻尘，客舍青青柳色新。劝君更尽一杯酒，西出阳关无故人。" },
   { title: "过故人庄", author: "孟浩然", dynasty: "唐", content: "故人具鸡黍，邀我至田家。绿树村边合，青山郭外斜。开轩面场圃，把酒话桑麻。待到重阳日，还来就菊花。" },
-  { title: "卜算子.送鲍浩然之浙东", author: "王观", dynasty: "宋", content: "卜算子·送鲍浩然之浙东水是眼波横，山是眉峰聚。欲问行人去那边？眉眼盈盈处。才始送春归，又送君归去。若到江南赶上春，千万和春住。" },
-  { title: "满江红", author: "岳飞", dynasty: " 宋 ", content: "满江红·写怀怒发冲冠，凭栏处、潇潇雨歇。抬望眼，仰天长啸，壮怀激烈。三十功名尘与土，八千里路云和月。莫等闲，白了少年头，空悲切！靖康耻，犹未雪。臣子恨，何时灭！驾长车，踏破贺兰山缺。壮志饥餐胡虏肉，笑谈渴饮匈奴血。待从头、收拾旧山河，朝天阙。" },
+  { title: "卜算子.送鲍浩然之浙东", author: "王观", dynasty: "宋", content: "水是眼波横，山是眉峰聚。欲问行人去那边？眉眼盈盈处。才始送春归，又送君归去。若到江南赶上春，千万和春住。" },
+  { title: "满江红", author: "岳飞", dynasty: " 宋 ", content: "怒发冲冠，凭栏处、潇潇雨歇。抬望眼，仰天长啸，壮怀激烈。三十功名尘与土，八千里路云和月。莫等闲，白了少年头，空悲切！靖康耻，犹未雪。臣子恨，何时灭！驾长车，踏破贺兰山缺。壮志饥餐胡虏肉，笑谈渴饮匈奴血。待从头、收拾旧山河，朝天阙。" },
   { title: "秋思", author: "张籍", dynasty: "唐", content: "洛阳城里见秋风，欲作家书意万重。复恐匆匆说不尽，行人临发又开封。" },
   { title: "枫桥夜泊", author: "张继", dynasty: "唐", content: "月落乌啼霜满天，江枫渔火对愁眠。姑苏城外寒山寺，夜半钟声到客船。" },
   { title: "早梅", author: "张渭", dynasty: " 唐 ", content: "一树寒梅白玉条，迥临村路傍溪桥。不知近水花先发，疑是经冬雪未销。" },
   { title: "渔歌子", author: "张志和", dynasty: "唐", content: "西塞山前白鹭飞，桃花流水鳜鱼肥。青箬笠，绿蓑衣，斜风细雨不须归。" },
   { title: "竹石", author: "郑燮", dynasty: "清", content: "咬定青山不放松，立根原在破岩中。千磨万击还坚劲，任尔东西南北风。" },
-  { title: "终南望余雪", author: "祖咏", dynasty: "唐", content: "终南望余雪/终南望残雪终南阴岭秀，积雪浮云端。林表明霁色，城中增暮寒。" },
-  { title: "长恨歌", author: "白居易", dynasty: "唐", content: "汉皇重色思倾国，御宇多年求不得。杨家有女初长成，养在深闺人未识。天生丽质难自弃，一朝选在君王侧。回眸一笑百媚生，六宫粉黛无颜色。春寒赐浴华清池，温泉水滑洗凝脂。侍儿扶起娇无力，始是新承恩泽时。云鬓花颜金步摇，芙蓉帐暖度春宵。春宵苦短日高起，从此君王不早朝。承欢侍宴无闲暇，春从春游夜专夜。后宫佳丽三千人，三千宠爱在一身。金屋妆成娇侍夜，玉楼宴罢醉和春。姊妹弟兄皆列土，可怜光彩生门户。遂令天下父母心，不重生男重生女。骊宫高处入青云，仙乐风飘处处闻。缓歌慢舞凝丝竹，尽日君王看不足。渔阳鼙鼓动地来，惊破霓裳羽衣曲。九重城阙烟尘生，千乘万骑西南行。翠华摇摇行复止，西出都门百余里。车队走走停停，西出长安才百余里。六军不发无奈何，宛转娥眉马前死。花钿委地无人收，翠翘金雀玉搔头。君王掩面救不得，回看血泪相和流。黄埃散漫风萧索，云栈萦纡登剑阁。峨嵋山下少人行，旌旗无光日色薄。蜀江水碧蜀山青，圣主朝朝暮暮情。蜀地山清水秀，引得君王相思情行。行宫见月伤心色，夜雨闻铃肠断声。天旋日转回龙驭，到此踌躇不能去。马嵬坡下泥土中，不见玉颜空死处。君臣相顾尽沾衣，东望都门信马归。归来池苑皆依旧，太液芙蓉未央柳。芙蓉如面柳如眉，对此如何不泪垂。春风桃李花开夜，秋雨梧桐叶落时。西宫南苑多秋草，落叶满阶红不扫。梨园弟子白发新，椒房阿监青娥老。戏子头已雪白，宫女红颜尽褪。夕殿萤飞思悄然，孤灯挑尽未成眠。迟迟钟鼓初长夜，耿耿星河欲曙天。鸳鸯瓦冷霜华重，翡翠衾寒谁与共。悠悠生死别经年，魂魄不曾来入梦。临邛道士鸿都客，能以精诚致魂魄。为感君王辗转思，遂教方士殷勤觅。排空驭气奔如电，升天入地求之遍。上穷碧落下黄泉，两处茫茫皆不见。遍寻天堂地府，都毫无结果。忽闻海上有仙山，山在虚无缥渺间。楼阁玲珑五云起，其中绰约多仙子。中有一人字太真，雪肤花貌参差是。金阙西厢叩玉扃，转教小玉报双成。闻道汉家天子使，九华帐里梦魂惊。揽衣推枕起徘徊，珠箔银屏迤逦开。云鬓半偏新睡觉，花冠不整下堂来。风吹仙袂飘飖举，犹似霓裳羽衣舞。玉容寂寞泪阑干，梨花一枝春带雨。含情凝睇谢君王，一别音容两渺茫。昭阳殿里恩爱绝，蓬莱宫中日月长。回头下望人寰处，不见长安见尘雾。惟将旧物表深情，钿合金钗寄将去。钗留一股合一扇，钗擘黄金合分钿。但令心似金钿坚，天上人间会相见。临别殷勤重寄词，词中有誓两心知。七月七日长生殿，夜半无人私语时。在天愿作比翼鸟，在地愿为连理枝。天长地久有时尽，此恨绵绵无绝期。" },
+  { title: "终南望余雪", author: "祖咏", dynasty: "唐", content: "终南阴岭秀，积雪浮云端。林表明霁色，城中增暮寒。" },
+  { title: "长恨歌", author: "白居易", dynasty: "唐", content: "汉皇重色思倾国，御宇多年求不得。杨家有女初长成，养在深闺人未识。天生丽质难自弃，一朝选在君王侧。回眸一笑百媚生，六宫粉黛无颜色。春寒赐浴华清池，温泉水滑洗凝脂。侍儿扶起娇无力，始是新承恩泽时。云鬓花颜金步摇，芙蓉帐暖度春宵。春宵苦短日高起，从此君王不早朝。承欢侍宴无闲暇，春从春游夜专夜。后宫佳丽三千人，三千宠爱在一身。金屋妆成娇侍夜，玉楼宴罢醉和春。姊妹弟兄皆列土，可怜光彩生门户。遂令天下父母心，不重生男重生女。骊宫高处入青云，仙乐风飘处处闻。缓歌慢舞凝丝竹，尽日君王看不足。渔阳鼙鼓动地来，惊破霓裳羽衣曲。九重城阙烟尘生，千乘万骑西南行。翠华摇摇行复止，西出都门百余里。六军不发无奈何，宛转娥眉马前死。花钿委地无人收，翠翘金雀玉搔头。君王掩面救不得，回看血泪相和流。黄埃散漫风萧索，云栈萦纡登剑阁。峨嵋山下少人行，旌旗无光日色薄。蜀江水碧蜀山青，圣主朝朝暮暮情。行宫见月伤心色，夜雨闻铃肠断声。天旋日转回龙驭，到此踌躇不能去。马嵬坡下泥土中，不见玉颜空死处。君臣相顾尽沾衣，东望都门信马归。归来池苑皆依旧，太液芙蓉未央柳。芙蓉如面柳如眉，对此如何不泪垂。春风桃李花开夜，秋雨梧桐叶落时。西宫南苑多秋草，落叶满阶红不扫。梨园弟子白发新，椒房阿监青娥老。夕殿萤飞思悄然，孤灯挑尽未成眠。迟迟钟鼓初长夜，耿耿星河欲曙天。鸳鸯瓦冷霜华重，翡翠衾寒谁与共。悠悠生死别经年，魂魄不曾来入梦。临邛道士鸿都客，能以精诚致魂魄。为感君王辗转思，遂教方士殷勤觅。排空驭气奔如电，升天入地求之遍。上穷碧落下黄泉，两处茫茫皆不见。忽闻海上有仙山，山在虚无缥缈间。楼阁玲珑五云起，其中绰约多仙子。中有一人字太真，雪肤花貌参差是。金阙西厢叩玉扃，转教小玉报双成。闻道汉家天子使，九华帐里梦魂惊。揽衣推枕起徘徊，珠箔银屏迤逦开。云鬓半偏新睡觉，花冠不整下堂来。风吹仙袂飘飖举，犹似霓裳羽衣舞。玉容寂寞泪阑干，梨花一枝春带雨。含情凝睇谢君王，一别音容两渺茫。昭阳殿里恩爱绝，蓬莱宫中日月长。回头下望人寰处，不见长安见尘雾。惟将旧物表深情，钿合金钗寄将去。钗留一股合一扇，钗擘黄金合分钿。但令心似金钿坚，天上人间会相见。临别殷勤重寄词，词中有誓两心知。七月七日长生殿，夜半无人私语时。在天愿作比翼鸟，在地愿为连理枝。天长地久有时尽，此恨绵绵无绝期。" },
   { title: "天净沙·秋思", author: "马致远", dynasty: "元", content: "枯藤老树昏鸦，小桥流水人家，古道西风瘦马。夕阳西下，断肠人在天涯。" },
   { title: "春望", author: "杜甫", dynasty: "唐", content: "国破山河在，城春草木深。感时花溅泪，恨别鸟惊心。烽火连三月，家书抵万金。白头搔更短，浑欲不胜簪。" },
   { title: "夜雨寄北", author: "李商隐", dynasty: "唐", content: "君问归期未有期，巴山夜雨涨秋池。何当共剪西窗烛，却话巴山夜雨时。" },
-  { title: "归园田居其三", author: "陶渊明", dynasty: "魏晋", content: "归园田居·其三种豆南山下，草盛豆苗稀。晨兴理荒秽，带月荷锄归。道狭草木长，夕露沾我衣。衣沾不足惜，但使愿无违。" },
+  { title: "归园田居其三", author: "陶渊明", dynasty: "魏晋", content: "种豆南山下，草盛豆苗稀。晨兴理荒秽，带月荷锄归。道狭草木长，夕露沾我衣。衣沾不足惜，但使愿无违。" },
   { title: "赠刘景文", author: "苏轼", dynasty: "宋", content: "荷尽已无擎雨盖，菊残犹有傲霜枝。一年好景君须记，最是橙黄橘绿时。" },
-  { title: "卜算子.咏梅", author: "毛泽东", dynasty: "现", content: "卜算子·咏梅风雨送春归，飞雪迎春到。已是悬崖百丈冰，犹有花枝俏。俏也不争春，只把春来报。待到山花烂漫时，她在丛中笑。" },
-  { title: "观书有感其二", author: "朱熹", dynasty: "宋", content: "观书有感二首·其二昨夜江边春水生，蒙冲巨舰一毛轻。向来枉费推移力，此日中流自在行。" },
+  { title: "卜算子.咏梅", author: "毛泽东", dynasty: "现", content: "风雨送春归，飞雪迎春到。已是悬崖百丈冰，犹有花枝俏。俏也不争春，只把春来报。待到山花烂漫时，她在丛中笑。" },
+  { title: "观书有感其二", author: "朱熹", dynasty: "宋", content: "昨夜江边春水生，蒙冲巨舰一毛轻。向来枉费推移力，此日中流自在行。" },
 ];
 
 const STYLES = [
@@ -213,6 +213,78 @@ interface HistoryItem {
   styleId: string;
 }
 
+export interface RegionInfo {
+  anchorX_px: number;
+  anchorY_px: number;
+  isDark: boolean;
+}
+
+export const analyzeImageForLayout = (imageUrl: string, width: number = 1920, height: number = 1080): Promise<RegionInfo> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 360;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      const regions = [
+        { name: 'TR', x: canvas.width * 0.6, y: canvas.height * 0.05, w: canvas.width * 0.35, h: canvas.height * 0.6, anchorX: width * 0.88, anchorY: height * 0.15 },
+        { name: 'TL', x: canvas.width * 0.05, y: canvas.height * 0.05, w: canvas.width * 0.35, h: canvas.height * 0.6, anchorX: width * 0.35, anchorY: height * 0.15 },
+        { name: 'BR', x: canvas.width * 0.6, y: canvas.height * 0.4, w: canvas.width * 0.35, h: canvas.height * 0.55, anchorX: width * 0.88, anchorY: height * 0.4 },
+        { name: 'BL', x: canvas.width * 0.05, y: canvas.height * 0.4, w: canvas.width * 0.35, h: canvas.height * 0.55, anchorX: width * 0.35, anchorY: height * 0.4 }
+      ];
+
+      let bestRegion = regions[0];
+      let minVariance = Infinity;
+      let bestRegionAvgLuma = 0;
+
+      for (const r of regions) {
+        let sumLuma = 0;
+        let sumLumaSq = 0;
+        let count = 0;
+
+        for (let y = Math.floor(r.y); y < Math.floor(r.y + r.h); y += 4) {
+          for (let x = Math.floor(r.x); x < Math.floor(r.x + r.w); x += 4) {
+            const i = (y * canvas.width + x) * 4;
+            const rVal = data[i];
+            const gVal = data[i + 1];
+            const bVal = data[i + 2];
+            const luma = 0.2126 * rVal + 0.7152 * gVal + 0.0722 * bVal;
+            sumLuma += luma;
+            sumLumaSq += luma * luma;
+            count++;
+          }
+        }
+
+        const avgLuma = sumLuma / count;
+        const variance = (sumLumaSq / count) - (avgLuma * avgLuma);
+
+        // Penalty for regions that are non-uniform (high variance)
+        if (variance < minVariance) {
+          minVariance = variance;
+          bestRegion = r;
+          bestRegionAvgLuma = avgLuma;
+        }
+      }
+
+      resolve({
+        anchorX_px: bestRegion.anchorX,
+        anchorY_px: bestRegion.anchorY,
+        isDark: bestRegionAvgLuma < 128
+      });
+    };
+    img.onerror = () => {
+      resolve({ anchorX_px: width * 0.88, anchorY_px: height * 0.15, isDark: false }); // Fallback Top-Right
+    };
+    img.src = imageUrl;
+  });
+};
+
 export default function App() {
   const [hasKey, setHasKey] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -231,6 +303,33 @@ export default function App() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatingChars, setAnimatingChars] = useState<any[]>([]);
   const [showOverlayText, setShowOverlayText] = useState(false);
+  const [currentLayout, setCurrentLayout] = useState<{ anchorX: number, anchorY: number, textColor: string, shadowColor: string } | null>(null);
+
+  const [isPlayingBgm, setIsPlayingBgm] = useState(false);
+  const [hasAutoPlayedBgm, setHasAutoPlayedBgm] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      // 当处于朗读状态时，降低背景音乐音量
+      audioRef.current.volume = isSpeaking ? 0.2 : 1.0;
+    }
+  }, [isSpeaking]);
+
+  const toggleBgm = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setHasAutoPlayedBgm(true);
+    if (audioRef.current) {
+      if (isPlayingBgm) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(err => console.error("Audio playback prevented", err));
+      }
+      setIsPlayingBgm(!isPlayingBgm);
+    }
+  };
 
   useEffect(() => {
     const checkKey = async () => {
@@ -242,6 +341,13 @@ export default function App() {
       }
     };
     checkKey();
+
+    // Cleanup speech synthesis on unmount
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, []);
 
   const handleSelectKey = async () => {
@@ -255,22 +361,91 @@ export default function App() {
   const poemListRef = useRef<HTMLDivElement>(null);
 
   const handlePoemClick = (index: number) => {
+    // Attempt ambient autoplay on first interaction if not playing
+    if (audioRef.current && !hasAutoPlayedBgm) {
+      setHasAutoPlayedBgm(true);
+      if (!isPlayingBgm) {
+        audioRef.current.play().then(() => setIsPlayingBgm(true)).catch(() => { });
+      }
+    }
+
     if (selectedPoemIndex === index && expandedPoemIndex === index) {
       setExpandedPoemIndex(null);
     } else {
       setSelectedPoemIndex(index);
       setExpandedPoemIndex(index);
 
-      // Scroll the clicked item to the top of the list container
+      // Wait slightly longer than the 300ms CSS height animation to avoid DOM shifting during collapse
       setTimeout(() => {
         const item = document.getElementById(`poem-item-${index}`);
-        if (item) {
-          item.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+        if (item && poemListRef.current) {
+          const container = poemListRef.current;
+          const containerRect = container.getBoundingClientRect();
+          const itemRect = item.getBoundingClientRect();
+          // Calculate precise scroll target with an 8px top padding offset for breathing room
+          const targetTop = container.scrollTop + (itemRect.top - containerRect.top) - 8;
+
+          container.scrollTo({
+            top: targetTop,
+            behavior: 'smooth'
           });
         }
-      }, 300); // Increased timeout to ensure expansion animation doesn't interfere
+      }, 350);
+    }
+  };
+
+  const handleSpeakPoem = (poem: typeof POEMS[0], index: number) => {
+    if ('speechSynthesis' in window) {
+      // Toggle play/stop for the same poem
+      if (isSpeaking && speakingIndex === index) {
+        window.speechSynthesis.cancel();
+        setIsSpeaking(false);
+        setSpeakingIndex(null);
+        return;
+      }
+
+      // Stop anything currently playing
+      window.speechSynthesis.cancel();
+
+      setIsSpeaking(true);
+      setSpeakingIndex(index);
+
+      // Format text with pauses implicitly via punctuation
+      const textToSpeak = `${poem.title}。${poem.dynasty}代，${poem.author}。${poem.content}`;
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
+      // 优先寻找微软更高质量的中文女声（如晓晓、晓伊）或男声（如云希）
+      // 如果是在 MacOS 的 Safari 或 Edge 下，寻找 Ting-Ting 或相应的增强发音
+      const voices = window.speechSynthesis.getVoices();
+      console.log('Available voices:', voices.map(v => v.name));
+
+      let bestVoice = voices.find(v => v.name.includes('Xiaoxiao')); // Microsoft Xiaoxiao Online (Natural)
+      if (!bestVoice) bestVoice = voices.find(v => v.name.includes('Yunxi')); // Microsoft Yunxi Online (Natural)
+      if (!bestVoice) bestVoice = voices.find(v => v.name.includes('Ting-Ting')); // Mac Safari
+      if (!bestVoice) bestVoice = voices.find(v => v.name.includes('Tingting')); // Mac Chrome
+      if (!bestVoice) bestVoice = voices.find(v => v.name.includes('Yaoyao') || v.name.includes('Kangkang')); // Mac legacy
+      if (!bestVoice) bestVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('cmn')); // 兜底任何中文
+
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+        console.log('Selected Voice:', bestVoice.name);
+      }
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.8; // 更慢一点，增强古风诗意
+      utterance.pitch = 1.0;
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        setSpeakingIndex(null);
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setSpeakingIndex(null);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setError("您的浏览器当前不支持语音朗读功能。");
     }
   };
 
@@ -340,114 +515,107 @@ export default function App() {
     }
   };
 
-  const handleLeadPoemIntoPainting = (poemOverride?: typeof POEMS[0]) => {
+  const handleLeadPoemIntoPainting = async (poemOverride?: typeof POEMS[0]) => {
     if (!imageUrl || isAnimating) return;
     setIsAnimating(true);
     setShowOverlayText(false);
 
-    // Calculate background brightness before animating
+    // Calculate background brightness and dynamic anchor point
+    let anchorX_px = 1920 * 0.88;
+    let anchorY_px = 1080 * 0.15;
     let isDarkBackground = false;
     try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = imageUrl;
-
-      const tempCanvas = document.createElement('canvas');
-      const ctx = tempCanvas.getContext('2d');
-      if (ctx) {
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        const s = tempCanvas.width / 1920;
-        const sampleWidth = Math.min(tempCanvas.width / 3, 600 * s);
-        const sampleX = tempCanvas.width - sampleWidth;
-        const imageData = ctx.getImageData(sampleX, 100 * s, sampleWidth, 600 * s);
-
-        let rSum = 0, gSum = 0, bSum = 0;
-        let count = 0;
-        for (let i = 0; i < imageData.data.length; i += 16) {
-          rSum += imageData.data[i];
-          gSum += imageData.data[i + 1];
-          bSum += imageData.data[i + 2];
-          count++;
-        }
-
-        const avgR = rSum / count;
-        const avgG = gSum / count;
-        const avgB = bSum / count;
-
-        const luminance = (0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
-        isDarkBackground = luminance < 128;
-      }
+      const layoutAnalysis = await analyzeImageForLayout(imageUrl);
+      anchorX_px = layoutAnalysis.anchorX_px;
+      anchorY_px = layoutAnalysis.anchorY_px;
+      isDarkBackground = layoutAnalysis.isDark;
     } catch (e) {
-      console.warn("Could not sample image background for animation", e);
+      console.warn("Could not calculate smart layout, using default", e);
+    }
+
+    const poem = poemOverride || currentPoem;
+    const lines = poem.content.split(/[，。！？、,.!?\s]+/).filter(l => l.trim().length > 0);
+
+    // Safety clamp to prevent cutting off text on the left edge if placed in TL/BL regions
+    const requiredWidth = (lines.length + 3) * 80;
+    if (anchorX_px - requiredWidth < 120) {
+      anchorX_px = requiredWidth + 120;
     }
 
     const textColor = isDarkBackground ? 'rgba(255, 255, 255, 0.95)' : 'rgba(20, 20, 20, 0.9)';
     const shadowColor = isDarkBackground ? '2px 2px 10px rgba(0,0,0,0.8)' : '2px 2px 10px rgba(255,255,255,0.6)';
     const sealTextShadow = 'none';
 
-    const poem = poemOverride || currentPoem;
+    setCurrentLayout({ anchorX: anchorX_px, anchorY: anchorY_px, textColor: textColor, shadowColor: shadowColor });
+
     const chars: any[] = [];
     let delay = 0;
     const charDelay = 150; // ms per character
 
-    // 1. Title
-    for (let i = 0; i < poem.title.length; i++) {
-      chars.push({
-        char: poem.title[i],
-        targetX: 100 - (120 / 1920 * 100), // exactly 93.75
-        targetY: (120 + i * 90) / 1080 * 100,
-        delay: delay,
-        textColor: textColor,
-        shadowColor: shadowColor
-      });
-      delay += charDelay;
-    }
+    let currentX_px = anchorX_px;
 
-    // 2. Author & Dynasty (Removed brackets)
-    const authorText = `${poem.dynasty} ${poem.author}`;
-    for (let i = 0; i < authorText.length; i++) {
-      chars.push({
-        char: authorText[i],
-        targetX: 100 - (220 / 1920 * 100), // exactly 88.541666...
-        targetY: (120 + i * 45) / 1080 * 100,
-        delay: delay,
-        textColor: textColor,
-        shadowColor: shadowColor
-      });
-      delay += charDelay;
-    }
-
-    // 3. Content
-    const lines = poem.content.split(/[，。！？、,.!?\s]+/).filter(l => l.trim().length > 0);
-    // currentX in pixel scale
-    let currentX_px = 1920 - 320;
+    // 1. Content (Body)
     for (let line of lines) {
+      let currentY_px = anchorY_px;
       for (let i = 0; i < line.length; i++) {
         chars.push({
           char: line[i],
+          type: 'body',
           targetX: currentX_px / 1920 * 100,
-          targetY: (120 + i * 60) / 1080 * 100,
+          targetY: currentY_px / 1080 * 100,
           delay: delay,
           textColor: textColor,
           shadowColor: shadowColor
         });
+        currentY_px += 60; // 60px line height for body
         delay += charDelay;
       }
-      currentX_px -= 80;
+      currentX_px -= 55; // 缩小列间距以排布更多诗句（原80）
+    }
+
+    // 2. Title
+    currentX_px -= 15; // Extra padding between body and title
+    let titleY_px = anchorY_px + 80; // Title starts slightly lower
+    for (let i = 0; i < poem.title.length; i++) {
+      chars.push({
+        char: poem.title[i],
+        type: 'title',
+        targetX: currentX_px / 1920 * 100,
+        targetY: titleY_px / 1080 * 100,
+        delay: delay,
+        textColor: textColor,
+        shadowColor: shadowColor
+      });
+      titleY_px += 45; // Use same line height as author
+      delay += charDelay;
+    }
+
+    // 3. Author & Dynasty
+    currentX_px -= 55; // Padding to author
+    const authorText = `${poem.dynasty} ${poem.author}`;
+    let authorY_px = anchorY_px + 160; // Author starts even lower
+    for (let i = 0; i < authorText.length; i++) {
+      chars.push({
+        char: authorText[i],
+        type: 'author',
+        targetX: currentX_px / 1920 * 100,
+        targetY: authorY_px / 1080 * 100,
+        delay: delay,
+        textColor: textColor,
+        shadowColor: shadowColor
+      });
+      authorY_px += 45; // Tighter line height for smaller font
+      delay += charDelay;
     }
 
     // 4. Draw Author Seal
-    let sealCenterX_px = currentX_px + 80;
-    let lastLineLength = lines[lines.length - 1]?.length || 0;
-    let sealTopY_px = 140 + (lastLineLength * 60);
+    let sealCenterX_px = currentX_px;
+    let sealTopY_px = authorY_px + 20; // Just below the author text
 
     chars.push({
       isSeal: true,
-      text: poem.author, // Add author text property for rendering inside seal
-      targetX: sealCenterX_px / 1920 * 100, // We will center via transform translate
+      text: poem.author,
+      targetX: sealCenterX_px / 1920 * 100,
       targetY: sealTopY_px / 1080 * 100,
       delay: delay,
       textColor: textColor,
@@ -597,12 +765,34 @@ export default function App() {
       {/* Left Sidebar: Controls */}
       <div className="w-[480px] flex flex-col gap-6 h-full">
         {/* Top: Product Name and Logo */}
-        <div className="gufeng-card p-6 flex items-center justify-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-red-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-          <h1 className="text-3xl font-bold tracking-[0.3em] flex items-center gap-4 relative z-10">
-            <span className="text-red-800 font-brush">诗画</span>
-            <span className="text-black/80">大宗师</span>
-          </h1>
+        <div
+          className="gufeng-card p-6 flex flex-col items-center justify-center relative overflow-hidden group shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/60 min-h-[160px]"
+          style={{
+            backgroundImage: `url(/header-bg.png)`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'right center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        >
+          {/* Subtle gradient overlay to ensure text legibility while revealing the art on the right */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/60 to-transparent"></div>
+
+          <div className="relative z-10 flex flex-col items-start justify-between w-full px-2 h-full py-2">
+            <h1 className="text-4xl font-bold tracking-[0.25em] flex items-center gap-2 drop-shadow-sm mt-2">
+              <span className="text-stone-800 font-brush transform -translate-y-1">墨韵</span>
+              <span className="text-red-800 font-serif">灵笔</span>
+            </h1>
+            <button
+              onClick={toggleBgm}
+              className="absolute top-2 right-2 p-3 rounded-full bg-white/40 hover:bg-white/70 backdrop-blur-sm border border-stone-200 shadow-sm transition-all text-stone-700 z-50 hidden"
+              title="古琴伴奏"
+            >
+              {isPlayingBgm ? <Music size={20} className="animate-pulse" /> : <VolumeX size={20} />}
+            </button>
+            <p className="text-xs font-serif tracking-[0.4em] text-stone-600/90 font-bold bg-white/40 px-4 py-2 rounded-sm backdrop-blur-[2px] border border-white/50 shadow-sm mt-8">
+              泼墨千年<span className="mx-1 text-red-800/80">·</span><span className="text-stone-800">幻化成真</span>
+            </p>
+          </div>
         </div>
 
         {/* Middle: Poem Library */}
@@ -612,13 +802,22 @@ export default function App() {
               <BookOpen size={20} className="text-red-800/60" />
               <h2 className="text-xl font-bold font-serif tracking-widest">诗词名篇</h2>
             </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2.5 hover:bg-black/5 rounded-full transition-all hover:rotate-90 duration-500"
-              title="设置"
-            >
-              <Settings size={20} className="text-gray-500" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleBgm}
+                className="p-2.5 hover:bg-black/5 rounded-full transition-all text-gray-500"
+                title="古琴伴奏 - 播放/静音"
+              >
+                {isPlayingBgm ? <Music size={20} className="animate-pulse text-red-800" /> : <VolumeX size={20} />}
+              </button>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2.5 hover:bg-black/5 rounded-full transition-all hover:rotate-90 duration-500"
+                title="设置"
+              >
+                <Settings size={20} className="text-gray-500" />
+              </button>
+            </div>
           </div>
 
           <div className="relative group">
@@ -662,6 +861,21 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      <div title="原声朗读">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSpeakPoem(poem, index);
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${isSpeaking && speakingIndex === index
+                            ? 'bg-amber-100 text-amber-800 shadow-sm animate-pulse'
+                            : 'bg-white/80 text-amber-700 hover:bg-white shadow-sm'
+                            }`}
+                        >
+                          {isSpeaking && speakingIndex === index ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                          <span>听</span>
+                        </button>
+                      </div>
                       <div title="生成意境画卷">
                         <button
                           onClick={(e) => {
@@ -706,23 +920,28 @@ export default function App() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
                         className="overflow-hidden"
                       >
                         <div className="p-6 bg-black/5 rounded-3xl shadow-inner flex justify-center">
                           <div className={`w-full flex justify-center overflow-x-auto ${poem.content.split(/[，。！？、\n]/).filter(l => l.trim().length > 0).length <= 4 ? 'scrollbar-hide' : 'custom-scrollbar'}`}>
-                            <div className={`flex flex-row-reverse gap-8 p-6 bg-white/30 backdrop-blur-md rounded-2xl ${selectedFont} min-w-fit h-fit self-center shadow-sm`}>
-                              {/* Column 1: Title & Author (Right side in RTL) */}
-                              <div className="flex flex-col items-center pl-6 shrink-0">
-                                <div className="text-3xl font-bold mb-4 vertical-text tracking-widest">{poem.title}</div>
-                                <div className="text-sm opacity-60 mt-auto pb-4 vertical-text tracking-widest">
+                            <div className={`flex flex-row-reverse p-6 bg-white/30 backdrop-blur-md rounded-2xl ${selectedFont} w-max h-fit self-center shadow-sm`}>
+                              {/* Title Column */}
+                              <div className="flex flex-col flex-start shrink-0 ml-5 w-12 items-center">
+                                <div className="text-3xl font-bold vertical-text tracking-widest leading-none">{poem.title}</div>
+                              </div>
+
+                              {/* Author & Dynasty Column */}
+                              <div className="flex flex-col justify-end shrink-0 h-full ml-1 w-6 items-center">
+                                <div className="text-sm opacity-60 pb-4 vertical-text tracking-widest leading-none">
                                   {poem.dynasty} · {poem.author}
                                 </div>
                               </div>
 
-                              {/* Column 2: Poem Content (Left side in RTL) */}
-                              <div className="flex flex-row-reverse gap-6 items-center h-full">
+                              {/* Poem Content Column */}
+                              <div className="flex flex-row-reverse gap-1.5 items-center h-full pl-3 pr-2 border-l border-stone-300/40">
                                 {poem.content.split(/[，。！？、\n]/).filter(l => l.trim().length > 0).map((line, i) => (
-                                  <div key={i} className="text-2xl leading-[1.8] vertical-text whitespace-nowrap">
+                                  <div key={i} className="text-2xl leading-[1.8] vertical-text whitespace-nowrap w-10 shrink-0 flex justify-center">
                                     {line}
                                   </div>
                                 ))}
@@ -752,26 +971,39 @@ export default function App() {
         <AnimatePresence mode="wait">
           {!imageUrl && !isGenerating && (
             <motion.div
+              key="empty-state"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col items-center justify-center text-gray-400 p-12 text-center"
+              className="flex-1 flex flex-col items-center justify-center text-gray-400 p-12 text-center relative"
+              style={{
+                backgroundImage: `url(/welcome-bg-optimized.jpg)`,
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }}
             >
-              <div className="w-32 h-32 bg-black/5 rounded-full flex items-center justify-center mb-8 relative">
-                <ImageIcon size={48} className="text-gray-300" />
-                <div className="absolute inset-0 border-2 border-dashed border-gray-300 rounded-full animate-[spin_20s_linear_infinite]"></div>
+              {/* Add a subtle dark/light gradient overlay to make sure text is readable against the background art */}
+              <div className="absolute inset-0 bg-white/20"></div>
+
+              <div className="relative z-10 flex flex-col items-center justify-center h-full pt-10">
+                <div className="text-4xl font-serif text-stone-800 tracking-[0.8em] mb-6 font-bold opacity-90" style={{ textShadow: '0 2px 10px rgba(255,255,255,0.8)' }}>
+                  待启画卷
+                </div>
+                <div className="w-12 h-[1px] bg-stone-800/20 mb-6"></div>
+                <p className="text-sm font-sans mt-2 text-stone-700 tracking-[0.25em] max-w-sm leading-8 bg-white/30 px-8 py-5 rounded-3xl backdrop-blur-md border border-white/40 shadow-sm font-medium text-center">
+                  请在左侧选择一首诗词，<br />开启“诗中有画，画中有诗”的唯美意境。
+                </p>
               </div>
-              <div className="text-3xl font-serif text-stone-600 tracking-[0.4em]">待启画卷</div>
-              <p className="text-sm font-sans mt-6 text-stone-500 tracking-[0.2em] max-w-xs leading-relaxed">
-                请在左侧选择一首诗词，<br />开启“诗中有画，画中有诗”的唯美意境。
-              </p>
             </motion.div>
           )}
 
           {(imageUrl || isGenerating) && (
             <motion.div
+              key="output-state"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
               className="flex-1 flex flex-col overflow-hidden"
             >
               {/* Image Container - Prioritized */}
@@ -810,9 +1042,9 @@ export default function App() {
                                 color: item.textColor || 'rgba(255, 255, 255, 0.95)',
                                 textShadow: item.shadowColor || 'none',
                                 // match CanvasOverlay sizes exactly using container query height:
-                                // title = 72px (1920 base), author = 32px, content = 48px, seal = 24px
-                                // relative to 1080 height: 72/1080 = 6.666cqh, 32/1080 = 2.963cqh, 48/1080 = 4.444cqh, 24/1080 = 2.222cqh
-                                fontSize: item.isSeal ? '2.222cqh' : item.targetX > 90 ? '6.666cqh' : item.targetX > 85 ? '2.963cqh' : '4.444cqh',
+                                // title = 32px, author = 32px, content = 48px, seal = 24px
+                                // relative to 1080 height: 32/1080 = 2.963cqh, 48/1080 = 4.444cqh, 24/1080 = 2.222cqh
+                                fontSize: item.isSeal ? '2.222cqh' : (item.type === 'title' || item.type === 'author') ? '2.963cqh' : '4.444cqh',
                                 filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.1))',
                                 width: item.isSeal ? 'auto' : 'auto',
                                 height: item.isSeal ? 'auto' : 'auto',
@@ -992,6 +1224,7 @@ export default function App() {
                         content={currentPoem.content}
                         styleId={selectedStyleId}
                         showText={showOverlayText}
+                        layoutInfo={currentLayout || undefined}
                         fontFamily={
                           selectedFont === 'font-calligraphy' ? '"Zhi Mang Xing", cursive' :
                             selectedFont === 'font-brush' ? '"Ma Shan Zheng", cursive' :
@@ -1030,6 +1263,8 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+
+      <audio ref={audioRef} src="/bgm.mp3" loop />
     </div>
   );
 }

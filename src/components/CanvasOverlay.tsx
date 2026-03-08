@@ -10,6 +10,12 @@ interface CanvasOverlayProps {
   styleId: string;
   showText?: boolean;
   fontFamily?: string;
+  layoutInfo?: {
+    anchorX: number;
+    anchorY: number;
+    textColor: string;
+    shadowColor: string;
+  };
 }
 
 export default function CanvasOverlay({
@@ -20,7 +26,8 @@ export default function CanvasOverlay({
   content,
   styleId,
   showText = true,
-  fontFamily = '"Zhi Mang Xing", cursive'
+  fontFamily = '"Zhi Mang Xing", cursive',
+  layoutInfo
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isReady, setIsReady] = useState(false);
@@ -49,39 +56,9 @@ export default function CanvasOverlay({
       // Scale factor assuming base width of 1920 for 16:9
       const s = canvas.width / 1920;
 
-      // Calculate background brightness before drawing text
-      let isDarkBackground = false;
-      try {
-        // Sample a region where text is drawn (right side)
-        const sampleWidth = Math.min(canvas.width / 3, 600 * s);
-        const sampleX = canvas.width - sampleWidth;
-        const imageData = ctx.getImageData(sampleX, 100 * s, sampleWidth, 600 * s);
-
-        let rSum = 0, gSum = 0, bSum = 0;
-        let count = 0;
-        // Sample every 4th pixel to save processing time
-        for (let i = 0; i < imageData.data.length; i += 16) {
-          rSum += imageData.data[i];
-          gSum += imageData.data[i + 1];
-          bSum += imageData.data[i + 2];
-          count++;
-        }
-
-        const avgR = rSum / count;
-        const avgG = gSum / count;
-        const avgB = bSum / count;
-
-        // standard relative luminance (W3C)
-        const luminance = (0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
-        isDarkBackground = luminance < 128;
-      } catch (e) {
-        // Fallback if cross-origin policy blocks getImageData
-        isDarkBackground = false;
-      }
-
-      // Automatically adjust color based on background
-      const textColor = isDarkBackground ? 'rgba(255, 255, 255, 0.95)' : 'rgba(20, 20, 20, 0.9)';
-      const shadowColor = isDarkBackground ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.6)';
+      // Calculate layout starting points based on intelligent layout data
+      const textColor = layoutInfo?.textColor || 'rgba(20, 20, 20, 0.9)';
+      const shadowColor = layoutInfo?.shadowColor || 'rgba(255,255,255,0.6)';
 
       ctx.save();
       ctx.globalAlpha = textOpacity;
@@ -96,37 +73,39 @@ export default function CanvasOverlay({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      // 1. Draw Title
-      ctx.font = `bold ${72 * s}px ${fontFamily}`;
-      let titleX = canvas.width - (120 * s); // App.tsx: 93.75% of 1920 = 1800 -> 1920 - 120
-      let titleY = 120 * s; // App.tsx: 11.11% of 1080 = 120
-      for (let i = 0; i < title.length; i++) {
-        ctx.fillText(title[i], titleX, titleY);
-        titleY += 90 * s; // App.tsx: 8.33% of 1080 = 90
-      }
+      let currentX_px = layoutInfo ? layoutInfo.anchorX : 1920 * 0.88;
+      let anchorY_px = layoutInfo ? layoutInfo.anchorY : 1080 * 0.15;
 
-      // 2. Draw Author & Dynasty
-      ctx.font = `${32 * s}px ${fontFamily}`;
-      let authorText = `${dynasty} ${author}`;
-      let authorX = canvas.width - (220 * s); // App.tsx: 88.54% of 1920 = 1700 -> 1920 - 220
-      let authorY = 120 * s;
-      for (let i = 0; i < authorText.length; i++) {
-        ctx.fillText(authorText[i], authorX, authorY);
-        authorY += 45 * s; // App.tsx: 4.16% of 1080 = 45
-      }
-
-      // 3. Draw Content
+      // 1. Draw Content (Body)
       ctx.font = `${48 * s}px ${fontFamily}`;
       let lines = content.split(/[，。！？、,.!?\s]+/).filter(l => l.trim().length > 0);
-      let contentX = canvas.width - (320 * s); // App.tsx: 83.33% of 1920 = 1600 -> 1920 - 320
 
       for (let line of lines) {
-        let contentY = 120 * s; // App.tsx: 11.11% of 1080 = 120
+        let currentY_px = anchorY_px;
         for (let i = 0; i < line.length; i++) {
-          ctx.fillText(line[i], contentX, contentY);
-          contentY += 60 * s; // App.tsx: 5.55% of 1080 = 60
+          ctx.fillText(line[i], currentX_px * s, currentY_px * s);
+          currentY_px += 60; // 60px line height for body
         }
-        contentX -= 80 * s; // App.tsx: 4.16% of 1920 = 80
+        currentX_px -= 55; // 缩小列间距 (原80)
+      }
+
+      // 2. Draw Title
+      currentX_px -= 15; // Extra padding between body and title
+      let titleY_px = anchorY_px + 80; // Title starts slightly lower
+      ctx.font = `bold ${32 * s}px ${fontFamily}`;
+      for (let i = 0; i < title.length; i++) {
+        ctx.fillText(title[i], currentX_px * s, titleY_px * s);
+        titleY_px += 45; // Use same line height as author
+      }
+
+      // 3. Draw Author & Dynasty
+      currentX_px -= 55; // Padding to author
+      let authorY_px = anchorY_px + 160; // Author starts even lower
+      ctx.font = `${32 * s}px ${fontFamily}`;
+      let authorText = `${dynasty} ${author}`;
+      for (let i = 0; i < authorText.length; i++) {
+        ctx.fillText(authorText[i], currentX_px * s, authorY_px * s);
+        authorY_px += 45; // Tighter line height for smaller font
       }
 
       // 4. Draw Author Seal
@@ -139,9 +118,8 @@ export default function CanvasOverlay({
       const sealWidth = sealCharSize + sealPaddingX * 2;
       const sealHeight = (author.length * sealCharSize) + sealPaddingY * 2;
 
-      const sealCenterX = contentX + 80 * s;
-      const lastLineLength = lines[lines.length - 1]?.length || 0;
-      const sealTopY = (140 * s) + (lastLineLength * 60 * s);
+      const sealCenterX = currentX_px * s;
+      const sealTopY = (authorY_px + 20) * s;
 
       const sealX = sealCenterX - sealWidth / 2;
       const sealY = sealTopY;
@@ -180,7 +158,9 @@ export default function CanvasOverlay({
     };
 
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
@@ -207,7 +187,9 @@ export default function CanvasOverlay({
     const link = document.createElement('a');
     link.download = `shihua-${title}-${Date.now()}.png`;
     link.href = dataUrl;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
   return (
