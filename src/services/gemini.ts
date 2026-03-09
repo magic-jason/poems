@@ -4,18 +4,22 @@ export interface PoemAnalysis {
   analysis: string;
   authorIntro: string;
   imagePrompt: string;
+  pinyinData: Array<{ char: string; pinyin: string }>;
+  vocabulary: Array<{ word: string; explanation: string }>;
 }
 
-export async function analyzePoem(poem: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
+export async function analyzePoem(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: `你是一位精通中华传统文化的“诗画大宗师”。
-请根据以下古诗词和艺术风格，完成诗意解析和作者介绍，并提供一段用于AI图像生成的英文Prompt。
+请根据以下古诗词和艺术风格，完成诗意解析、作者介绍、疑难词汇解释，提供用于AI图像生成的英文Prompt，并将原诗正文转换为带拼音的数据结构。
 
-古诗词：${poem}
+古诗词（标题与作者）：《${title}》 ${author}
+古诗词（正文）：
+${content}
 艺术风格：${styleName}
 风格要求：${stylePrompt}
 
@@ -26,12 +30,29 @@ export async function analyzePoem(poem: string, styleName: string, stylePrompt: 
 4. 【字数限制】：
    - analysis (诗意解析): 必须控制在 40 个汉字以内，用一句话提炼核心意象。
    - authorIntro (作者介绍): 必须控制在 60 个汉字以内，简述作者生平及艺术风格。
+5. 【拼音数据结构】：
+   - 必须将传入的“古诗词（正文）”全文（*不要*包含标题和作者，包括标点符号）逐字拆解，组装成 pinyinData 数组返回。
+   - 每个元素必须包含 "char"（原字符）和 "pinyin"（该汉字的拼音，小写带声调）。对于标点符号，pinyin 字段留空字符串。
+6. 【重点词汇解释】：
+   - 提取出古诗中的 2 到 4 个疑难或重点词汇。
+   - 每个词汇配备精确的解释，信息必须准确无误。放入 vocabulary 数组中。
 
-请以JSON格式返回：
+请以JSON格式返回，示例：
 {
-  "analysis": "诗意解析：一句话提炼，40字以内。",
-  "authorIntro": "作者介绍：简明扼要，60字以内。",
-  "imagePrompt": "英文Prompt：一段纯视觉的英文描述，严禁包含 'text', 'calligraphy', 'writing', 'characters', 'poem', 'alphabet', 'words' 等单词。"
+  "analysis": "...",
+  "authorIntro": "...",
+  "imagePrompt": "...",
+  "pinyinData": [
+    {"char": "床", "pinyin": "chuáng"},
+    {"char": "前", "pinyin": "qián"},
+    {"char": "明", "pinyin": "míng"},
+    {"char": "月", "pinyin": "yuè"},
+    {"char": "光", "pinyin": "guāng"},
+    {"char": "，", "pinyin": ""}
+  ],
+  "vocabulary": [
+    {"word": "明月", "explanation": "明亮的月亮。"}
+  ]
 }`,
     config: {
       responseMimeType: "application/json",
@@ -40,9 +61,31 @@ export async function analyzePoem(poem: string, styleName: string, stylePrompt: 
         properties: {
           analysis: { type: Type.STRING },
           authorIntro: { type: Type.STRING },
-          imagePrompt: { type: Type.STRING }
+          imagePrompt: { type: Type.STRING },
+          pinyinData: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                char: { type: Type.STRING },
+                pinyin: { type: Type.STRING }
+              },
+              required: ["char", "pinyin"]
+            }
+          },
+          vocabulary: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                word: { type: Type.STRING },
+                explanation: { type: Type.STRING }
+              },
+              required: ["word", "explanation"]
+            }
+          }
         },
-        required: ["analysis", "authorIntro", "imagePrompt"]
+        required: ["analysis", "authorIntro", "imagePrompt", "pinyinData", "vocabulary"]
       }
     }
   });

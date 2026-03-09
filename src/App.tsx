@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings, X, History, Music, VolumeX, Volume2 } from 'lucide-react';
 import CanvasOverlay from './components/CanvasOverlay';
 import { analyzePoem, generateImage, PoemAnalysis } from './services/gemini';
+import { StudyCard } from './components/StudyCard';
+import { toPng } from 'html-to-image';
 
 const POEMS = [
   { title: "池上", author: "白居易", dynasty: "唐", content: "小娃撑小艇，偷采白莲回。不解藏踪迹，浮萍一道开。" },
@@ -294,6 +296,8 @@ export default function App() {
   const [analysis, setAnalysis] = useState<PoemAnalysis | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const studyCardRef = useRef<HTMLDivElement>(null);
 
   // New States
   const [selectedModel, setSelectedModel] = useState<'free' | 'paid'>('free');
@@ -487,10 +491,9 @@ export default function App() {
 
     const targetPoem = poemOverride || currentPoem;
     const style = STYLES.find(s => s.id === selectedStyleId)!;
-    const fullPoemText = `《${targetPoem.title}》[${targetPoem.dynasty}] ${targetPoem.author}\n${targetPoem.content}`;
 
     try {
-      const analysisResult = await analyzePoem(fullPoemText, style.name, style.prompt);
+      const analysisResult = await analyzePoem(targetPoem.title, targetPoem.author, targetPoem.content, style.name, style.prompt);
       const base64Image = await generateImage(analysisResult.imagePrompt, selectedModel);
 
       // Set both together so they appear at the same time
@@ -543,10 +546,11 @@ export default function App() {
     }
 
     const textColor = isDarkBackground ? 'rgba(255, 255, 255, 0.95)' : 'rgba(20, 20, 20, 0.9)';
-    const shadowColor = isDarkBackground ? '2px 2px 10px rgba(0,0,0,0.8)' : '2px 2px 10px rgba(255,255,255,0.6)';
+    const baseShadowColor = isDarkBackground ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
+    const cssTextShadow = `0px 0px 15px ${baseShadowColor}, 1px 1px 2px ${baseShadowColor}`;
     const sealTextShadow = 'none';
 
-    setCurrentLayout({ anchorX: anchorX_px, anchorY: anchorY_px, textColor: textColor, shadowColor: shadowColor });
+    setCurrentLayout({ anchorX: anchorX_px, anchorY: anchorY_px, textColor: textColor, shadowColor: baseShadowColor });
 
     const chars: any[] = [];
     let delay = 0;
@@ -565,7 +569,9 @@ export default function App() {
           targetY: currentY_px / 1080 * 100,
           delay: delay,
           textColor: textColor,
-          shadowColor: shadowColor
+          shadowColor: baseShadowColor, // Base color for canvas/other uses
+          cssTextShadow: cssTextShadow, // CSS string for text-shadow property
+          writingMode: 'vertical-rl'
         });
         currentY_px += 60; // 60px line height for body
         delay += charDelay;
@@ -584,7 +590,7 @@ export default function App() {
         targetY: titleY_px / 1080 * 100,
         delay: delay,
         textColor: textColor,
-        shadowColor: shadowColor
+        shadowColor: cssTextShadow
       });
       titleY_px += 45; // Use same line height as author
       delay += charDelay;
@@ -602,7 +608,7 @@ export default function App() {
         targetY: authorY_px / 1080 * 100,
         delay: delay,
         textColor: textColor,
-        shadowColor: shadowColor
+        shadowColor: cssTextShadow
       });
       authorY_px += 45; // Tighter line height for smaller font
       delay += charDelay;
@@ -631,6 +637,31 @@ export default function App() {
       setShowOverlayText(true);
       setAnimatingChars([]);
     }, totalDuration);
+  };
+
+  const handleExportCard = async () => {
+    if (!studyCardRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      // 增加稍微延时等待 DOM 确保渲染完毕，图片资源加载完成
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const imageDataUrl = await toPng(studyCardRef.current, {
+        pixelRatio: 2, // 提高导出清晰度 (2x retina屏级)
+        backgroundColor: '#F8F9FA', // 设置与背景一致的颜色
+        skipFonts: true, // 忽略外部字体的跨域拉取，直接使用系统兜底衬线体，防止控制台报错
+      });
+
+      const link = document.createElement('a');
+      link.download = `学霸导学卡-${currentPoem.title}.png`;
+      link.href = imageDataUrl;
+      link.click();
+    } catch (err) {
+      console.error("导出卡片失败:", err);
+      setError("导出导学卡失败，请重试");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (!hasKey) {
@@ -1040,7 +1071,7 @@ export default function App() {
                                 position: 'absolute',
                                 transform: 'translate(-50%, 0)',
                                 color: item.textColor || 'rgba(255, 255, 255, 0.95)',
-                                textShadow: item.shadowColor || 'none',
+                                textShadow: item.cssTextShadow || item.shadowColor || 'none',
                                 // match CanvasOverlay sizes exactly using container query height:
                                 // title = 32px, author = 32px, content = 48px, seal = 24px
                                 // relative to 1080 height: 32/1080 = 2.963cqh, 48/1080 = 4.444cqh, 24/1080 = 2.222cqh
@@ -1225,6 +1256,8 @@ export default function App() {
                         styleId={selectedStyleId}
                         showText={showOverlayText}
                         layoutInfo={currentLayout || undefined}
+                        onExportCard={handleExportCard}
+                        isExporting={isExporting}
                         fontFamily={
                           selectedFont === 'font-calligraphy' ? '"Zhi Mang Xing", cursive' :
                             selectedFont === 'font-brush' ? '"Ma Shan Zheng", cursive' :
@@ -1259,6 +1292,23 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              {/* Invisible StudyCard component for drawing the export image */}
+              <div className="fixed overflow-hidden pointer-events-none" style={{ left: '-9999px', top: 0 }}>
+                {analysis && analysis.pinyinData && imageUrl && (
+                  <StudyCard
+                    ref={studyCardRef}
+                    title={currentPoem.title}
+                    author={currentPoem.author}
+                    dynasty={currentPoem.dynasty}
+                    imageUrl={imageUrl}
+                    analysis={analysis.analysis}
+                    authorIntro={analysis.authorIntro}
+                    pinyinData={analysis.pinyinData}
+                    vocabulary={analysis.vocabulary}
+                  />
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

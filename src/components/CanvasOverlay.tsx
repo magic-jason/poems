@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, BookOpen, Loader2 } from 'lucide-react';
 
 interface CanvasOverlayProps {
   imageUrl: string;
@@ -16,6 +16,8 @@ interface CanvasOverlayProps {
     textColor: string;
     shadowColor: string;
   };
+  onExportCard?: () => void;
+  isExporting?: boolean;
 }
 
 export default function CanvasOverlay({
@@ -27,7 +29,9 @@ export default function CanvasOverlay({
   styleId,
   showText = true,
   fontFamily = '"Zhi Mang Xing", cursive',
-  layoutInfo
+  layoutInfo,
+  onExportCard,
+  isExporting
 }: CanvasOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isReady, setIsReady] = useState(false);
@@ -66,9 +70,9 @@ export default function CanvasOverlay({
 
       // Ensure good contrast with a responsive shadow
       ctx.shadowColor = shadowColor;
-      ctx.shadowBlur = 10 * s;
-      ctx.shadowOffsetX = 1 * s;
-      ctx.shadowOffsetY = 1 * s;
+      ctx.shadowBlur = 18 * s; // Inreased to 18 for high contrast
+      ctx.shadowOffsetX = 2 * s;
+      ctx.shadowOffsetY = 2 * s;
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -201,13 +205,29 @@ export default function CanvasOverlay({
       />
 
       {isReady && (
-        <div className="absolute top-6 right-6 z-50 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-2 group-hover:translate-y-0">
+        <div className="absolute top-6 right-8 z-50 opacity-0 group-hover:opacity-100 transition-all duration-700 translate-y-2 group-hover:translate-y-0 flex items-center gap-4">
+          {onExportCard && (
+            <button
+              onClick={onExportCard}
+              disabled={isExporting}
+              className="px-6 py-2.5 bg-white/80 hover:bg-white backdrop-blur-xl text-stone-700 hover:text-red-800 rounded-full transition-all duration-500 shadow-[0_8px_30px_rgb(0,0,0,0.1)] hover:shadow-[0_8px_30px_rgba(201,42,42,0.15)] border border-white/50 font-serif tracking-widest flex items-center gap-2.5 group/btn disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+              title="一键生成学霸导学卡"
+            >
+              {isExporting ? (
+                <Loader2 className="animate-spin text-red-800" size={16} strokeWidth={1.5} />
+              ) : (
+                <BookOpen size={16} strokeWidth={1.5} className="group-hover/btn:scale-110 transition-transform duration-500" />
+              )}
+              <span className="text-sm">导 出</span>
+            </button>
+          )}
           <button
             onClick={handleDownload}
-            className="p-4 bg-white/80 backdrop-blur-md text-black rounded-full hover:bg-white transition-all shadow-xl border border-white/20 group/btn"
+            className="px-6 py-2.5 bg-white/80 hover:bg-white backdrop-blur-xl text-stone-700 hover:text-red-800 rounded-full transition-all duration-500 shadow-[0_8px_30px_rgb(0,0,0,0.1)] hover:shadow-[0_8px_30px_rgba(201,42,42,0.15)] border border-white/50 font-serif tracking-widest flex items-center gap-2.5 group/btn hover:-translate-y-0.5"
             title="下载意境图"
           >
-            <Download size={24} className="group-hover/btn:scale-110 transition-transform" />
+            <Download size={16} strokeWidth={1.5} className="group-hover/btn:scale-110 transition-transform duration-500" />
+            <span className="text-sm">保 存</span>
           </button>
         </div>
       )}
