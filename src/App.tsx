@@ -300,7 +300,7 @@ export default function App() {
   const studyCardRef = useRef<HTMLDivElement>(null);
 
   // New States
-  const [selectedModel, setSelectedModel] = useState<'free' | 'paid'>('free');
+  const [selectedModel, setSelectedModel] = useState<'free' | 'paid' | 'wanxiang'>('free');
   const [selectedFont, setSelectedFont] = useState<'font-calligraphy' | 'font-brush' | 'font-cursive'>('font-brush');
   const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState<Record<string, HistoryItem>>({});
@@ -643,13 +643,37 @@ export default function App() {
     if (!studyCardRef.current || isExporting) return;
     setIsExporting(true);
     try {
-      // 增加稍微延时等待 DOM 确保渲染完毕，图片资源加载完成
+      // 1. 确保所有图片不仅加载完成，而且已解码为位图
+      const imgEls = Array.from(studyCardRef.current.querySelectorAll('img'));
+      await Promise.all(
+        imgEls.map(async (img) => {
+          if (!img.complete) {
+            await new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            });
+          }
+          // 重要：调用 decode() 确保浏览器已完成图像解码
+          try {
+            await img.decode();
+          } catch (e) {
+            console.warn("图像解码失败，尝试继续导出", e);
+          }
+        })
+      );
+
+      // 2. 额外等待 DOM 合成流完成
       await new Promise(resolve => setTimeout(resolve, 300));
 
+      // 3. 执行导出
+      // html-to-image 有时在首次调用时会丢失部分元素，这通常是因为内部缓存未就绪
+      // 这里我们先进行一次不保存的“预渲染”来热身
+      await toPng(studyCardRef.current, { skipFonts: true });
+      
       const imageDataUrl = await toPng(studyCardRef.current, {
-        pixelRatio: 2, // 提高导出清晰度 (2x retina屏级)
-        backgroundColor: '#F8F9FA', // 设置与背景一致的颜色
-        skipFonts: true, // 忽略外部字体的跨域拉取，直接使用系统兜底衬线体，防止控制台报错
+        pixelRatio: 2, 
+        backgroundColor: '#F8F9FA',
+        skipFonts: true, 
       });
 
       const link = document.createElement('a');
@@ -724,7 +748,7 @@ export default function App() {
               <div className="space-y-6">
                 <div className="space-y-3">
                   <label className="text-lg font-black text-stone-950 font-serif tracking-wider">生成模型</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setSelectedModel('free')}
                       className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'free' ? 'active' : 'bg-stone-200/60'}`}
@@ -738,6 +762,13 @@ export default function App() {
                     >
                       <span className="font-bold">极清画卷</span>
                       <span className="text-[10px] opacity-60">Gemini 3.1 Flash</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedModel('wanxiang')}
+                      className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'wanxiang' ? 'active' : 'bg-stone-200/60'}`}
+                    >
+                      <span className="font-bold">万象画卷</span>
+                      <span className="text-[10px] opacity-60">wan2.6-t2i</span>
                     </button>
                   </div>
                 </div>

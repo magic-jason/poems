@@ -46,7 +46,6 @@ export const StudyCard = React.forwardRef<HTMLDivElement, StudyCardProps>(({
                     src={imageUrl}
                     alt="AI Generated Artwork"
                     className="w-full h-auto object-cover"
-                    crossOrigin="anonymous" // 重要，防止 html2canvas 跨域污染
                 />
                 {/* 微妙的内阴影边框增加作品感 */}
                 <div className="absolute inset-0 border border-black/10 pointer-events-none" />

@@ -97,11 +97,132 @@ ${content}
   return JSON.parse(response.text);
 }
 
-export async function generateImage(prompt: string, modelType: 'free' | 'paid'): Promise<string> {
+/**
+ * Helper to fetch image from URL and convert to Base64 via local proxy
+ */
+async function fetchImageAsBase64(imageUrl: string): Promise<string> {
+  const proxiedUrl = `/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+  const imgResponse = await fetch(proxiedUrl);
+  if (!imgResponse.ok) {
+    throw new Error(`下载生成图片失败 (${imgResponse.status})`);
+  }
+  const blob = await imgResponse.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Wanxiang v2.5 Async Generation (Fallback)
+ */
+async function generateImageWanxiangAsync(prompt: string, apiKey: string): Promise<string> {
+  const negativePrompt = "文字, 书法, 诗句, 印章, 签名, 卷轴, 书本, 纸张, 字幕, 水印, letters, text, writing, watermark, signature, calligraphy, scroll, paper texture with writing";
+  
+  // 1. Create Task
+  const createResponse = await fetch('/dashscope-api/v1/services/aigc/text2image/image-synthesis', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'X-DashScope-Async': 'enable'
+    },
+    body: JSON.stringify({
+      model: "wan2.5-t2i-preview",
+      input: { prompt: `${prompt}. Traditional Chinese style, pure visual scene.` },
+      parameters: { size: "1280*720", n: 1, negative_prompt: negativePrompt }
+    }),
+  });
+
+  if (!createResponse.ok) {
+    throw new Error(`万相 v2.5 创建任务失败: ${await createResponse.text()}`);
+  }
+
+  const createData = await createResponse.json();
+  const taskId = createData.output?.task_id;
+  if (!taskId) throw new Error("未获取到任务 ID");
+
+  // 2. Poll Task
+  let attempts = 0;
+  const maxAttempts = 30; // 30 * 2s = 60s
+  while (attempts < maxAttempts) {
+    await new Promise(r => setTimeout(r, 2000));
+    const taskResponse = await fetch(`/dashscope-api/v1/tasks/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` }
+    });
+    
+    if (!taskResponse.ok) throw new Error("轮询任务状态失败");
+    const taskData = await taskResponse.json();
+    const status = taskData.output?.task_status;
+
+    if (status === 'SUCCEEDED') {
+      const url = taskData.output?.results?.[0]?.url;
+      if (!url) throw new Error("任务成功但未返回 URL");
+      return fetchImageAsBase64(url);
+    } else if (status === 'FAILED') {
+      throw new Error(`生成失败: ${taskData.output?.message || '未知错误'}`);
+    }
+    attempts++;
+  }
+  throw new Error("生成超时（60秒）");
+}
+
+export async function generateImageWanxiang(prompt: string): Promise<string> {
+  const apiKey = import.meta.env.VITE_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY;
+  if (!apiKey) {
+    throw new Error("未配置阿里云百炼 API Key（VITE_DASHSCOPE_API_KEY）。");
+  }
+
+  try {
+    // Attempt wan2.6 Synchronous call first
+    const negativePrompt = "文字, 书法, 诗句, 印章, 签名, 卷轴, 书本, 纸张, 字幕, 水印, letters, text, writing, watermark, signature, calligraphy, scroll, paper texture with writing";
+    const requestBody = {
+      model: "wan2.6-t2i",
+      input: {
+        messages: [{
+          role: "user",
+          content: [{ text: `${prompt}. Traditional Chinese style, all elements (people, clothing, architecture) must be traditional Chinese. Pure visual scene with absolutely zero text elements.` }]
+        }]
+      },
+      parameters: { prompt_extend: true, watermark: false, n: 1, negative_prompt: negativePrompt, size: "1696*960" }
+    };
+
+    const response = await fetch('/dashscope-api/v1/services/aigc/multimodal-generation/generation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (!data.code) {
+        const imageUrl = data?.output?.choices?.[0]?.message?.content?.[0]?.image;
+        if (imageUrl) return fetchImageAsBase64(imageUrl);
+      }
+    }
+    console.warn("wan2.6 调用失败或额度不足，尝试降级到 wan2.5...");
+  } catch (e) {
+    console.warn("wan2.6 请求异常:", e);
+  }
+
+  // Fallback to wan2.5 Async
+  return generateImageWanxiangAsync(prompt, apiKey);
+}
+
+export async function generateImage(prompt: string, modelType: 'free' | 'paid' | 'wanxiang'): Promise<string> {
+
+  // Delegate to wanxiang model if selected
+  if (modelType === 'wanxiang') {
+    return generateImageWanxiang(prompt);
+  }
+
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
 
   const modelName = modelType === 'paid' ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
+
 
   // Force no text and Chinese elements in the image prompt
   const finalPrompt = `STRICT NEGATIVE CONSTRAINTS (CRITICAL):
