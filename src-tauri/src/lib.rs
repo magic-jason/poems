@@ -1,7 +1,7 @@
-mod dashscope;
-mod gemini;
+pub mod dashscope;
+pub mod gemini;
 mod http_assets;
-mod settings;
+pub mod settings;
 
 use gemini::{AnalyzePoemRequest, PoemAnalysis};
 use serde::Deserialize;
