@@ -10,7 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "tauri:build": "tauri build --no-bundle",
-    "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/package-portable.ps1"
+    "package:portable": "pwsh -NoLogo -NoProfile -File scripts/package-portable.ps1"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
