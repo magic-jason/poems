@@ -57,6 +57,12 @@
 
 目标交付物是一个免安装目录包：用户解压后，直接双击 `墨韵灵笔.exe` 即可运行。
 
+### 国内网络环境建议
+
+- 默认推荐先使用 `万象画卷`
+- `万象画卷` 会走 `DashScope 文本解析 + 万相出图` 的完整链路
+- 如果电脑无法访问 Google，`Gemini` 模式可能不可用，但不会影响 `万象画卷`
+
 ### 打包前提
 
 - 在 Windows 10/11 机器上执行
@@ -82,8 +88,9 @@ npm run package:portable
 
 运行时配置保存在：`%APPDATA%/poetry-painting/config.json`
 
-- 首次启动必须填写 `Gemini API Key`
-- 如果需要使用“万象画卷”，再补充 `DashScope API Key`
+- 国内 Windows 环境推荐默认使用“万象画卷”
+- 选择“万象画卷”时，只需填写 `DashScope API Key`
+- 选择 `Gemini` 模式时，需填写 `Gemini API Key`
 - 升级绿色包时，直接覆盖程序目录即可，配置不会丢失
 
 ## Portable release checklist

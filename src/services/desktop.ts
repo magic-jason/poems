@@ -1,6 +1,7 @@
 import type { PoemAnalysis } from './gemini';
 
 export type ModelType = 'free' | 'paid' | 'wanxiang';
+export type RequiredKey = 'gemini' | 'dashscope';
 
 export interface AppSettings {
   geminiApiKey: string;
@@ -25,13 +26,34 @@ export function normalizeSettings(input: RawSettings = {}): AppSettings {
   };
 }
 
+export function normalizeModelType(modelType?: string | null): ModelType {
+  return modelType === 'free' || modelType === 'paid' || modelType === 'wanxiang' ? modelType : 'wanxiang';
+}
+
+export function getRequiredKeyForModel(modelType: ModelType): RequiredKey {
+  return modelType === 'wanxiang' ? 'dashscope' : 'gemini';
+}
+
+export function isSettingsSatisfiedForModel(
+  settings: Pick<AppSettings, 'geminiApiKey' | 'dashscopeApiKey'>,
+  modelType: ModelType,
+): boolean {
+  const requiredKey = getRequiredKeyForModel(modelType);
+  if (requiredKey === 'dashscope') {
+    return Boolean(settings.dashscopeApiKey.trim());
+  }
+
+  return Boolean(settings.geminiApiKey.trim());
+}
+
 export function isAppConfiguredForUse(
   desktopMode: boolean,
-  settings: Pick<AppSettings, 'geminiApiKey'>,
+  settings: Pick<AppSettings, 'geminiApiKey' | 'dashscopeApiKey'>,
   hasExternalKey: boolean,
+  modelType: ModelType,
 ): boolean {
   if (desktopMode) {
-    return Boolean(settings.geminiApiKey.trim());
+    return isSettingsSatisfiedForModel(settings, modelType);
   }
 
   return hasExternalKey;
@@ -69,9 +91,10 @@ export async function analyzePoemDesktop(
   content: string,
   styleName: string,
   stylePrompt: string,
+  modelType: ModelType,
 ): Promise<PoemAnalysis> {
   return invokeCommand<PoemAnalysis>('analyze_poem', {
-    payload: { title, author, content, styleName, stylePrompt },
+    payload: { title, author, content, styleName, stylePrompt, modelType },
   });
 }
 

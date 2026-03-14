@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { analyzePoemDesktop, generateImageDesktop, isDesktopRuntime } from "./desktop";
+import { analyzePoemDesktop, generateImageDesktop, isDesktopRuntime, type ModelType } from "./desktop";
 
 export interface PoemAnalysis {
   analysis: string;
@@ -280,15 +280,15 @@ async function generateImageWeb(prompt: string, modelType: 'free' | 'paid' | 'wa
 }
 
 
-export async function analyzePoem(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
+export async function analyzePoem(title: string, author: string, content: string, styleName: string, stylePrompt: string, modelType: ModelType): Promise<PoemAnalysis> {
   if (isDesktopRuntime()) {
-    return analyzePoemDesktop(title, author, content, styleName, stylePrompt);
+    return analyzePoemDesktop(title, author, content, styleName, stylePrompt, modelType);
   }
 
   return analyzePoemWeb(title, author, content, styleName, stylePrompt);
 }
 
-export async function generateImage(prompt: string, modelType: 'free' | 'paid' | 'wanxiang'): Promise<string> {
+export async function generateImage(prompt: string, modelType: ModelType): Promise<string> {
   if (isDesktopRuntime()) {
     return generateImageDesktop(prompt, modelType);
   }

@@ -26,7 +26,11 @@ fn save_settings(settings: AppSettings) -> Result<(), String> {
 
 #[tauri::command]
 async fn analyze_poem(payload: AnalyzePoemRequest) -> Result<PoemAnalysis, String> {
-  gemini::analyze_poem(payload).await
+  match payload.model_type.as_deref() {
+    Some("wanxiang") => dashscope::analyze_poem(payload).await,
+    Some("free") | Some("paid") | None => gemini::analyze_poem(payload).await,
+    Some(other) => Err(format!("不支持的解析模型类型：{other}")),
+  }
 }
 
 #[tauri::command]

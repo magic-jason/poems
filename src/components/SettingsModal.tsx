@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings, X } from 'lucide-react';
-import type { AppSettings, ModelType } from '../services/desktop';
+import { isSettingsSatisfiedForModel, type AppSettings, type ModelType } from '../services/desktop';
 
 export type FontChoice = 'font-calligraphy' | 'font-brush' | 'font-cursive';
 
@@ -26,8 +26,11 @@ interface SettingsModalProps {
   onSave: () => void;
 }
 
-export function shouldOpenSettingsGate(settings: Pick<AppSettings, 'geminiApiKey'>): boolean {
-  return !settings.geminiApiKey.trim();
+export function shouldOpenSettingsGate(
+  settings: Pick<AppSettings, 'geminiApiKey' | 'dashscopeApiKey'>,
+  modelType: ModelType,
+): boolean {
+  return !isSettingsSatisfiedForModel(settings, modelType);
 }
 
 export default function SettingsModal({
@@ -67,7 +70,7 @@ export default function SettingsModal({
                 </div>
                 <div>
                   <h2 className="text-3xl font-black font-serif tracking-[0.2em] text-stone-950">工坊设置</h2>
-                  <p className="text-sm text-stone-500 mt-1">首次使用请先填写 Gemini Key，万相 Key 可后续补充。</p>
+                  <p className="text-sm text-stone-500 mt-1">按当前模型填写对应密钥即可开始；国内环境推荐先使用万相模式。</p>
                 </div>
               </div>
               {canClose && (
@@ -79,27 +82,27 @@ export default function SettingsModal({
 
             <div className="space-y-6">
               <div className="space-y-3">
-                <label className="text-lg font-black text-stone-950 font-serif tracking-wider">Gemini API Key <span className="text-red-800">*</span></label>
+                <label className="text-lg font-black text-stone-950 font-serif tracking-wider">Gemini API Key</label>
                 <input
                   value={settings.geminiApiKey}
                   onChange={(event) => onSettingsChange({ geminiApiKey: event.target.value })}
                   type="password"
-                  placeholder="用于诗词解析与 Gemini 出图"
+                  placeholder="用于 Gemini 解析与 Gemini 出图"
                   className="w-full rounded-2xl border border-stone-300/80 bg-white/80 px-4 py-3 text-stone-900 outline-none transition focus:border-red-700 focus:ring-2 focus:ring-red-200"
                 />
-                <p className="text-xs text-stone-500 leading-relaxed">诗词解析始终依赖 Gemini，因此这是桌面版的必填项。</p>
+                <p className="text-xs text-stone-500 leading-relaxed">选择“标准画卷 / 极清画卷”时需要填写。</p>
               </div>
 
               <div className="space-y-3">
-                <label className="text-lg font-black text-stone-950 font-serif tracking-wider">DashScope API Key <span className="text-stone-400 text-sm font-medium">(可选)</span></label>
+                <label className="text-lg font-black text-stone-950 font-serif tracking-wider">DashScope API Key</label>
                 <input
                   value={settings.dashscopeApiKey}
                   onChange={(event) => onSettingsChange({ dashscopeApiKey: event.target.value })}
                   type="password"
-                  placeholder="用于万象画卷"
+                  placeholder="用于万相解析与万相画卷"
                   className="w-full rounded-2xl border border-stone-300/80 bg-white/80 px-4 py-3 text-stone-900 outline-none transition focus:border-red-700 focus:ring-2 focus:ring-red-200"
                 />
-                <p className="text-xs text-stone-500 leading-relaxed">仅当你要使用“万象画卷”模型时才需要填写。</p>
+                <p className="text-xs text-stone-500 leading-relaxed">选择“万象画卷”时只需填写这一项。</p>
               </div>
 
               <div className="space-y-3">
@@ -171,7 +174,7 @@ export default function SettingsModal({
 
             <button
               onClick={onSave}
-              disabled={isSaving || !settings.geminiApiKey.trim()}
+              disabled={isSaving || !isSettingsSatisfiedForModel(settings, selectedModel)}
               className="w-full mt-8 py-4 bg-red-800 text-white rounded-full font-bold text-lg hover:bg-red-900 shadow-xl shadow-red-900/20 transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-400 disabled:shadow-none"
             >
               {isSaving ? '保存中...' : canClose ? '保存设置' : '保存并开始'}

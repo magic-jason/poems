@@ -13,6 +13,8 @@ pub struct AnalyzePoemRequest {
     pub content: String,
     pub style_name: String,
     pub style_prompt: String,
+    #[serde(default)]
+    pub model_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,7 +220,7 @@ fn extract_inline_image(body: &Value) -> Option<String> {
         })
 }
 
-fn build_analysis_prompt(
+pub(crate) fn build_analysis_prompt(
     title: &str,
     author: &str,
     content: &str,

@@ -4,7 +4,7 @@ import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings,
 import CanvasOverlay from './components/CanvasOverlay';
 import SettingsModal, { shouldOpenSettingsGate } from './components/SettingsModal';
 import { analyzePoem, generateImage, PoemAnalysis } from './services/gemini';
-import { type AppSettings, isAppConfiguredForUse, isDesktopRuntime, loadSettings, saveSettings } from './services/desktop';
+import { type AppSettings, isAppConfiguredForUse, isDesktopRuntime, isSettingsSatisfiedForModel, loadSettings, normalizeModelType, saveSettings } from './services/desktop';
 import { StudyCard } from './components/StudyCard';
 import { toPng } from 'html-to-image';
 
@@ -312,7 +312,7 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   const studyCardRef = useRef<HTMLDivElement>(null);
 
-  const [selectedModel, setSelectedModel] = useState<'free' | 'paid' | 'wanxiang'>('free');
+  const [selectedModel, setSelectedModel] = useState<'free' | 'paid' | 'wanxiang'>('wanxiang');
   const [selectedFont, setSelectedFont] = useState<'font-calligraphy' | 'font-brush' | 'font-cursive'>('font-brush');
   const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState<Record<string, HistoryItem>>({});
@@ -356,15 +356,14 @@ export default function App() {
           if (cancelled) return;
 
           setAppSettings(loaded);
-          if (loaded.lastModelType === 'free' || loaded.lastModelType === 'paid' || loaded.lastModelType === 'wanxiang') {
-            setSelectedModel(loaded.lastModelType);
-          }
+          const initialModel = normalizeModelType(loaded.lastModelType);
+          setSelectedModel(initialModel);
           if (loaded.lastUsedStyle && STYLES.some(style => style.id === loaded.lastUsedStyle)) {
             setSelectedStyleId(loaded.lastUsedStyle);
           }
 
-          setHasKey(isAppConfiguredForUse(true, loaded, false));
-          setShowSettings(shouldOpenSettingsGate(loaded));
+          setHasKey(isAppConfiguredForUse(true, loaded, false, initialModel));
+          setShowSettings(shouldOpenSettingsGate(loaded, initialModel));
         } else if ((window as any).aistudio && (window as any).aistudio.hasSelectedApiKey) {
           const selected = await (window as any).aistudio.hasSelectedApiKey();
           if (!cancelled) {
@@ -425,8 +424,8 @@ export default function App() {
       lastUsedStyle: selectedStyleId,
     };
 
-    if (!nextSettings.geminiApiKey.trim()) {
-      setError('请先填写 Gemini API Key。');
+    if (!isSettingsSatisfiedForModel(nextSettings, selectedModel)) {
+      setError(selectedModel === 'wanxiang' ? '请先填写 DashScope API Key。' : '请先填写 Gemini API Key。');
       return;
     }
 
@@ -437,7 +436,7 @@ export default function App() {
         await saveSettings(nextSettings);
       }
       setAppSettings(nextSettings);
-      setHasKey(isAppConfiguredForUse(desktopMode, nextSettings, !desktopMode || Boolean(nextSettings.geminiApiKey.trim())));
+      setHasKey(isAppConfiguredForUse(desktopMode, nextSettings, true, selectedModel));
       setShowSettings(false);
     } catch (saveError: any) {
       console.error('保存设置失败:', saveError);
@@ -569,14 +568,10 @@ export default function App() {
   }, [selectedPoemIndex, history, currentPoem.title]);
 
   const handleGenerate = async (poemOverride?: typeof POEMS[0]) => {
-    if (desktopMode && !appSettings.geminiApiKey.trim()) {
-      setError('请先在工坊设置中填写 Gemini API Key。');
-      setShowSettings(true);
-      return;
-    }
-
-    if (desktopMode && selectedModel === 'wanxiang' && !appSettings.dashscopeApiKey.trim()) {
-      setError('当前选择了万象画卷，请先在工坊设置中填写 DashScope API Key。');
+    if (desktopMode && !isSettingsSatisfiedForModel(appSettings, selectedModel)) {
+      setError(selectedModel === 'wanxiang'
+        ? '当前选择了万象画卷，请先在工坊设置中填写 DashScope API Key。'
+        : '当前选择了 Gemini 画卷，请先在工坊设置中填写 Gemini API Key。');
       setShowSettings(true);
       return;
     }
@@ -591,7 +586,7 @@ export default function App() {
     const style = STYLES.find(s => s.id === selectedStyleId)!;
 
     try {
-      const analysisResult = await analyzePoem(targetPoem.title, targetPoem.author, targetPoem.content, style.name, style.prompt);
+      const analysisResult = await analyzePoem(targetPoem.title, targetPoem.author, targetPoem.content, style.name, style.prompt, selectedModel);
       const base64Image = await generateImage(analysisResult.imagePrompt, selectedModel);
 
       // Set both together so they appear at the same time
@@ -786,8 +781,9 @@ export default function App() {
     }
   };
 
-  const appConfigured = isAppConfiguredForUse(desktopMode, appSettings, hasKey);
-  const desktopNeedsSetup = desktopMode && shouldOpenSettingsGate(appSettings);
+  const persistedModel = normalizeModelType(appSettings.lastModelType);
+  const appConfigured = isAppConfiguredForUse(desktopMode, appSettings, hasKey, persistedModel);
+  const desktopNeedsSetup = desktopMode && shouldOpenSettingsGate(appSettings, persistedModel);
 
   if (isBootstrapping) {
     return (
@@ -814,7 +810,7 @@ export default function App() {
           </div>
           <h2 className="text-3xl font-bold mb-6 font-serif tracking-widest">首次启卷</h2>
           <p className="text-gray-500 mb-10 leading-relaxed font-sans text-sm">
-            绿色版首次运行需要先填写 <code className="bg-black/5 px-2 py-1 rounded text-red-800 font-mono">Gemini API Key</code>。DashScope Key 可稍后在工坊设置中补充。
+            绿色版首次运行需要先填写当前模型所需密钥。默认推荐先配置 <code className="bg-black/5 px-2 py-1 rounded text-red-800 font-mono">DashScope API Key</code>，后续可在工坊设置中补充 Gemini Key。
           </p>
           <button
             onClick={() => setShowSettings(true)}
@@ -856,7 +852,7 @@ export default function App() {
           </div>
           <h2 className="text-3xl font-bold mb-6 font-serif tracking-widest">开启画卷</h2>
           <p className="text-gray-500 mb-10 leading-relaxed font-sans text-sm">
-            为了呈现最佳的 16:9 意境，建议使用 <code className="bg-black/5 px-2 py-1 rounded text-red-800 font-mono">Gemini 3.1 Flash</code> 模型。
+            当前所选模型缺少对应密钥。国内环境建议优先使用 <code className="bg-black/5 px-2 py-1 rounded text-red-800 font-mono">万象画卷</code> 并填写 DashScope API Key。
           </p>
           <button
             onClick={handleSelectKey}
