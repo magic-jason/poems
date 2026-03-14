@@ -25,6 +25,18 @@ export function normalizeSettings(input: RawSettings = {}): AppSettings {
   };
 }
 
+export function isAppConfiguredForUse(
+  desktopMode: boolean,
+  settings: Pick<AppSettings, 'geminiApiKey'>,
+  hasExternalKey: boolean,
+): boolean {
+  if (desktopMode) {
+    return Boolean(settings.geminiApiKey.trim());
+  }
+
+  return hasExternalKey;
+}
+
 export function isDesktopRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }

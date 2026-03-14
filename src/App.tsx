@@ -4,7 +4,7 @@ import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings,
 import CanvasOverlay from './components/CanvasOverlay';
 import SettingsModal, { shouldOpenSettingsGate } from './components/SettingsModal';
 import { analyzePoem, generateImage, PoemAnalysis } from './services/gemini';
-import { type AppSettings, isDesktopRuntime, loadSettings, saveSettings } from './services/desktop';
+import { type AppSettings, isAppConfiguredForUse, isDesktopRuntime, loadSettings, saveSettings } from './services/desktop';
 import { StudyCard } from './components/StudyCard';
 import { toPng } from 'html-to-image';
 
@@ -363,7 +363,7 @@ export default function App() {
             setSelectedStyleId(loaded.lastUsedStyle);
           }
 
-          setHasKey(Boolean(loaded.geminiApiKey || loaded.dashscopeApiKey));
+          setHasKey(isAppConfiguredForUse(true, loaded, false));
           setShowSettings(shouldOpenSettingsGate(loaded));
         } else if ((window as any).aistudio && (window as any).aistudio.hasSelectedApiKey) {
           const selected = await (window as any).aistudio.hasSelectedApiKey();
@@ -437,7 +437,7 @@ export default function App() {
         await saveSettings(nextSettings);
       }
       setAppSettings(nextSettings);
-      setHasKey(Boolean(nextSettings.geminiApiKey || nextSettings.dashscopeApiKey) || !desktopMode);
+      setHasKey(isAppConfiguredForUse(desktopMode, nextSettings, !desktopMode || Boolean(nextSettings.geminiApiKey.trim())));
       setShowSettings(false);
     } catch (saveError: any) {
       console.error('保存设置失败:', saveError);
@@ -786,6 +786,7 @@ export default function App() {
     }
   };
 
+  const appConfigured = isAppConfiguredForUse(desktopMode, appSettings, hasKey);
   const desktopNeedsSetup = desktopMode && shouldOpenSettingsGate(appSettings);
 
   if (isBootstrapping) {
@@ -843,7 +844,7 @@ export default function App() {
     );
   }
 
-  if (!hasKey) {
+  if (!appConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
         <div className="fixed top-[8%] left-[10%] w-32 h-32 bg-red-600/40 rounded-full blur-3xl -z-10 pointer-events-none sun-element"></div>
