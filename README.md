@@ -23,9 +23,10 @@
 
 1. 将当前代码推送到 GitHub 仓库
 2. 打开 GitHub 仓库的 `Actions` 标签页
-3. 选择 `Windows Portable Build`
-4. 点击 `Run workflow`
-5. 等待流程完成后，在该次运行页面下载 artifact：`poetry-painting-win-x64-portable`
+3. 等待 `Windows Portable Build` 在 `codex/windows-portable-tauri` 分支上成功
+4. 打开 GitHub 仓库的 `Releases` 页面
+5. 下载固定的 prerelease：`Latest Portable Build`
+6. 如果 Release 暂时没更新，可回到对应 workflow run 页面下载备用 artifact：`poetry-painting-win-x64-portable`
 
 ### 工作流做了什么
 
@@ -40,6 +41,9 @@
 5. 上传以下构建产物：
    - `dist-portable/poetry-painting-win-x64-portable.zip`
    - `dist-portable/墨韵灵笔/` 目录
+6. 仅在 `codex/windows-portable-tauri` 分支的非 PR 成功构建后：
+   - 强制更新固定 tag：`latest-portable`
+   - 自动更新固定 prerelease：`Latest Portable Build`
 
 ### 是否需要配置仓库 Secret
 

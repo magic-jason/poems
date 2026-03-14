@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:
-      contents: read
+      contents: write
     defaults:
       run:
         shell: pwsh
@@ -62,3 +62,38 @@ jobs:
             dist-portable/墨韵灵笔/**
           if-no-files-found: error
           retention-days: 14
+
+      - name: Capture release metadata
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/codex/windows-portable-tauri'
+        run: |
+          $EOF = (New-Guid).Guid
+          "PORTABLE_RELEASE_BODY<<$EOF" >> $env:GITHUB_ENV
+          "自动更新的 Windows 绿色版测试包。" >> $env:GITHUB_ENV
+          "" >> $env:GITHUB_ENV
+          "- Branch: ${{ github.ref_name }}" >> $env:GITHUB_ENV
+          "- Commit: ${{ github.sha }}" >> $env:GITHUB_ENV
+          "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $env:GITHUB_ENV
+          "- Built at (UTC): $(Get-Date -AsUTC -Format 'yyyy-MM-dd HH:mm:ss UTC')" >> $env:GITHUB_ENV
+          "$EOF" >> $env:GITHUB_ENV
+
+      - name: Force update latest portable tag
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/codex/windows-portable-tauri'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest-portable ${{ github.sha }}
+          git push origin refs/tags/latest-portable --force
+
+      - name: Publish latest portable prerelease
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/codex/windows-portable-tauri'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-portable
+          name: Latest Portable Build
+          body: ${{ env.PORTABLE_RELEASE_BODY }}
+          prerelease: true
+          draft: false
+          files: dist-portable/poetry-painting-win-x64-portable.zip
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          make_latest: false
