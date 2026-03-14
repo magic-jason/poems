@@ -35,15 +35,16 @@ try {
     Copy-Item $resourceDir (Join-Path $appDir 'resources') -Recurse -Force
   }
 
-  @"
-墨韵灵笔 Windows 绿色版
-========================
-
-1. 直接解压整个目录后运行 `墨韵灵笔.exe`
-2. 首次启动需填写 Gemini API Key
-3. 若需使用万象画卷，请在设置中补充 DashScope API Key
-4. 用户配置保存在 %APPDATA%\poetry-painting\config.json
-"@ | Set-Content -Path (Join-Path $appDir 'README.txt') -Encoding UTF8
+  $readmeLines = @(
+    '墨韵灵笔 Windows 绿色版',
+    '========================',
+    '',
+    '1. 直接解压整个目录后运行 墨韵灵笔.exe',
+    '2. 首次启动需填写 Gemini API Key',
+    '3. 若需使用万象画卷，请在设置中补充 DashScope API Key',
+    '4. 用户配置保存在 %APPDATA%\poetry-painting\config.json'
+  )
+  $readmeLines | Set-Content -Path (Join-Path $appDir 'README.txt') -Encoding UTF8
 
   if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
