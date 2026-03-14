@@ -1,3 +1,43 @@
+mod dashscope;
+mod gemini;
+mod http_assets;
+mod settings;
+
+use gemini::{AnalyzePoemRequest, PoemAnalysis};
+use serde::Deserialize;
+use settings::AppSettings;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GenerateImageRequest {
+  prompt: String,
+  model_type: String,
+}
+
+#[tauri::command]
+fn load_settings() -> Result<AppSettings, String> {
+  settings::load_settings().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn save_settings(settings: AppSettings) -> Result<(), String> {
+  settings::save_settings(&settings).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn analyze_poem(payload: AnalyzePoemRequest) -> Result<PoemAnalysis, String> {
+  gemini::analyze_poem(payload).await
+}
+
+#[tauri::command]
+async fn generate_image(payload: GenerateImageRequest) -> Result<String, String> {
+  match payload.model_type.as_str() {
+    "wanxiang" => dashscope::generate_image(&payload.prompt).await,
+    "free" | "paid" => gemini::generate_image(&payload.prompt, &payload.model_type).await,
+    other => Err(format!("不支持的模型类型：{other}")),
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -11,6 +51,7 @@ pub fn run() {
       }
       Ok(())
     })
+    .invoke_handler(tauri::generate_handler![load_settings, save_settings, analyze_poem, generate_image])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

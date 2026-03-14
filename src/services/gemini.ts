@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { analyzePoemDesktop, generateImageDesktop, isDesktopRuntime } from "./desktop";
 
 export interface PoemAnalysis {
   analysis: string;
@@ -8,7 +9,7 @@ export interface PoemAnalysis {
   vocabulary: Array<{ word: string; explanation: string }>;
 }
 
-export async function analyzePoem(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
+async function analyzePoemWeb(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
 
@@ -169,7 +170,7 @@ async function generateImageWanxiangAsync(prompt: string, apiKey: string): Promi
   throw new Error("生成超时（60秒）");
 }
 
-export async function generateImageWanxiang(prompt: string): Promise<string> {
+async function generateImageWanxiangWeb(prompt: string): Promise<string> {
   const apiKey = import.meta.env.VITE_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY;
   if (!apiKey) {
     throw new Error("未配置阿里云百炼 API Key（VITE_DASHSCOPE_API_KEY）。");
@@ -211,11 +212,11 @@ export async function generateImageWanxiang(prompt: string): Promise<string> {
   return generateImageWanxiangAsync(prompt, apiKey);
 }
 
-export async function generateImage(prompt: string, modelType: 'free' | 'paid' | 'wanxiang'): Promise<string> {
+async function generateImageWeb(prompt: string, modelType: 'free' | 'paid' | 'wanxiang'): Promise<string> {
 
   // Delegate to wanxiang model if selected
   if (modelType === 'wanxiang') {
-    return generateImageWanxiang(prompt);
+    return generateImageWanxiangWeb(prompt);
   }
 
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
@@ -276,4 +277,21 @@ export async function generateImage(prompt: string, modelType: 'free' | 'paid' |
   }
 
   return base64Image;
+}
+
+
+export async function analyzePoem(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
+  if (isDesktopRuntime()) {
+    return analyzePoemDesktop(title, author, content, styleName, stylePrompt);
+  }
+
+  return analyzePoemWeb(title, author, content, styleName, stylePrompt);
+}
+
+export async function generateImage(prompt: string, modelType: 'free' | 'paid' | 'wanxiang'): Promise<string> {
+  if (isDesktopRuntime()) {
+    return generateImageDesktop(prompt, modelType);
+  }
+
+  return generateImageWeb(prompt, modelType);
 }

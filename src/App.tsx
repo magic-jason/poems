@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings, X, History, Music, VolumeX, Volume2 } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings, History, Music, VolumeX, Volume2 } from 'lucide-react';
 import CanvasOverlay from './components/CanvasOverlay';
+import SettingsModal, { shouldOpenSettingsGate } from './components/SettingsModal';
 import { analyzePoem, generateImage, PoemAnalysis } from './services/gemini';
+import { type AppSettings, isDesktopRuntime, loadSettings, saveSettings } from './services/desktop';
 import { StudyCard } from './components/StudyCard';
 import { toPng } from 'html-to-image';
 
@@ -215,6 +217,13 @@ interface HistoryItem {
   styleId: string;
 }
 
+const EMPTY_SETTINGS: AppSettings = {
+  geminiApiKey: '',
+  dashscopeApiKey: '',
+  lastModelType: '',
+  lastUsedStyle: '',
+};
+
 export interface RegionInfo {
   anchorX_px: number;
   anchorY_px: number;
@@ -288,7 +297,11 @@ export const analyzeImageForLayout = (imageUrl: string, width: number = 1920, he
 };
 
 export default function App() {
+  const desktopMode = isDesktopRuntime();
   const [hasKey, setHasKey] = useState(false);
+  const [appSettings, setAppSettings] = useState<AppSettings>(EMPTY_SETTINGS);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPoemIndex, setSelectedPoemIndex] = useState(0);
   const [selectedStyleId, setSelectedStyleId] = useState(STYLES[0].id);
@@ -299,7 +312,6 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   const studyCardRef = useRef<HTMLDivElement>(null);
 
-  // New States
   const [selectedModel, setSelectedModel] = useState<'free' | 'paid' | 'wanxiang'>('free');
   const [selectedFont, setSelectedFont] = useState<'font-calligraphy' | 'font-brush' | 'font-cursive'>('font-brush');
   const [showSettings, setShowSettings] = useState(false);
@@ -317,7 +329,6 @@ export default function App() {
 
   useEffect(() => {
     if (audioRef.current) {
-      // 当处于朗读状态时，降低背景音乐音量
       audioRef.current.volume = isSpeaking ? 0.2 : 1.0;
     }
   }, [isSpeaking]);
@@ -336,28 +347,103 @@ export default function App() {
   };
 
   useEffect(() => {
-    const checkKey = async () => {
-      if ((window as any).aistudio && (window as any).aistudio.hasSelectedApiKey) {
-        const selected = await (window as any).aistudio.hasSelectedApiKey();
-        setHasKey(selected);
-      } else {
-        setHasKey(true);
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      try {
+        if (desktopMode) {
+          const loaded = await loadSettings();
+          if (cancelled) return;
+
+          setAppSettings(loaded);
+          if (loaded.lastModelType === 'free' || loaded.lastModelType === 'paid' || loaded.lastModelType === 'wanxiang') {
+            setSelectedModel(loaded.lastModelType);
+          }
+          if (loaded.lastUsedStyle && STYLES.some(style => style.id === loaded.lastUsedStyle)) {
+            setSelectedStyleId(loaded.lastUsedStyle);
+          }
+
+          setHasKey(Boolean(loaded.geminiApiKey || loaded.dashscopeApiKey));
+          setShowSettings(shouldOpenSettingsGate(loaded));
+        } else if ((window as any).aistudio && (window as any).aistudio.hasSelectedApiKey) {
+          const selected = await (window as any).aistudio.hasSelectedApiKey();
+          if (!cancelled) {
+            setHasKey(selected);
+          }
+        } else {
+          setHasKey(true);
+        }
+      } catch (bootstrapError: any) {
+        console.error('初始化设置失败:', bootstrapError);
+        if (!cancelled) {
+          if (desktopMode) {
+            setAppSettings(EMPTY_SETTINGS);
+            setHasKey(false);
+            setShowSettings(true);
+            setError('读取本地设置失败，请重新填写 API Key。');
+          } else {
+            setHasKey(true);
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBootstrapping(false);
+        }
       }
     };
-    checkKey();
 
-    // Cleanup speech synthesis on unmount
+    bootstrap();
+
     return () => {
+      cancelled = true;
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [desktopMode]);
 
   const handleSelectKey = async () => {
+    if (desktopMode) {
+      setShowSettings(true);
+      return;
+    }
+
     if ((window as any).aistudio && (window as any).aistudio.openSelectKey) {
       await (window as any).aistudio.openSelectKey();
       setHasKey(true);
+    }
+  };
+
+  const handleSettingsChange = (patch: Partial<AppSettings>) => {
+    setAppSettings(previous => ({ ...previous, ...patch }));
+  };
+
+  const handleSaveSettings = async () => {
+    const nextSettings: AppSettings = {
+      ...appSettings,
+      lastModelType: selectedModel,
+      lastUsedStyle: selectedStyleId,
+    };
+
+    if (!nextSettings.geminiApiKey.trim()) {
+      setError('请先填写 Gemini API Key。');
+      return;
+    }
+
+    setIsSettingsSaving(true);
+    setError(null);
+    try {
+      if (desktopMode) {
+        await saveSettings(nextSettings);
+      }
+      setAppSettings(nextSettings);
+      setHasKey(Boolean(nextSettings.geminiApiKey || nextSettings.dashscopeApiKey) || !desktopMode);
+      setShowSettings(false);
+    } catch (saveError: any) {
+      console.error('保存设置失败:', saveError);
+      setError(saveError.message || '保存设置失败，请重试');
+    } finally {
+      setIsSettingsSaving(false);
     }
   };
 
@@ -483,6 +569,18 @@ export default function App() {
   }, [selectedPoemIndex, history, currentPoem.title]);
 
   const handleGenerate = async (poemOverride?: typeof POEMS[0]) => {
+    if (desktopMode && !appSettings.geminiApiKey.trim()) {
+      setError('请先在工坊设置中填写 Gemini API Key。');
+      setShowSettings(true);
+      return;
+    }
+
+    if (desktopMode && selectedModel === 'wanxiang' && !appSettings.dashscopeApiKey.trim()) {
+      setError('当前选择了万象画卷，请先在工坊设置中填写 DashScope API Key。');
+      setShowSettings(true);
+      return;
+    }
+
     setIsGenerating(true);
     setError(null);
     setAnalysis(null);
@@ -688,10 +786,66 @@ export default function App() {
     }
   };
 
+  const desktopNeedsSetup = desktopMode && shouldOpenSettingsGate(appSettings);
+
+  if (isBootstrapping) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="fixed top-[8%] left-[10%] w-32 h-32 bg-red-600/40 rounded-full blur-3xl -z-10 pointer-events-none sun-element"></div>
+        <div className="gufeng-card p-12 max-w-lg text-center relative overflow-hidden group">
+          <Loader2 className="mx-auto mb-6 text-red-800 animate-spin" size={40} />
+          <h2 className="text-3xl font-bold mb-4 font-serif tracking-widest">正在铺展画卷</h2>
+          <p className="text-gray-500 leading-relaxed font-sans text-sm">正在读取本地设置与桌面环境，请稍候片刻。</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (desktopNeedsSetup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="fixed top-[8%] left-[10%] w-32 h-32 bg-red-600/40 rounded-full blur-3xl -z-10 pointer-events-none sun-element"></div>
+
+        <div className="gufeng-card p-12 max-w-xl text-center relative overflow-hidden group">
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-red-800/5 rounded-full blur-3xl group-hover:bg-red-800/10 transition-colors duration-1000"></div>
+          <div className="w-24 h-24 bg-red-800/10 text-red-800 rounded-3xl flex items-center justify-center mx-auto mb-8 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+            <Key size={48} />
+          </div>
+          <h2 className="text-3xl font-bold mb-6 font-serif tracking-widest">首次启卷</h2>
+          <p className="text-gray-500 mb-10 leading-relaxed font-sans text-sm">
+            绿色版首次运行需要先填写 <code className="bg-black/5 px-2 py-1 rounded text-red-800 font-mono">Gemini API Key</code>。DashScope Key 可稍后在工坊设置中补充。
+          </p>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-full bg-red-800 text-white px-8 py-5 rounded-2xl font-bold hover:bg-red-900 transition-all shadow-xl hover:shadow-red-900/30 text-lg tracking-widest"
+          >
+            现在配置
+          </button>
+        </div>
+
+        <SettingsModal
+          open={showSettings}
+          canClose={false}
+          settings={appSettings}
+          selectedModel={selectedModel}
+          selectedFont={selectedFont}
+          selectedStyleId={selectedStyleId}
+          styles={STYLES}
+          isSaving={isSettingsSaving}
+          onSettingsChange={handleSettingsChange}
+          onSelectModel={setSelectedModel}
+          onSelectFont={setSelectedFont}
+          onSelectStyle={setSelectedStyleId}
+          onClose={() => setShowSettings(false)}
+          onSave={handleSaveSettings}
+        />
+      </div>
+    );
+  }
+
   if (!hasKey) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Background Sun */}
         <div className="fixed top-[8%] left-[10%] w-32 h-32 bg-red-600/40 rounded-full blur-3xl -z-10 pointer-events-none sun-element"></div>
 
         <div className="gufeng-card p-12 max-w-lg text-center relative overflow-hidden group">
@@ -719,110 +873,22 @@ export default function App() {
       {/* Background Sun */}
       <div className="fixed top-[8%] left-[10%] w-32 h-32 bg-red-600/40 rounded-full blur-3xl -z-10 pointer-events-none sun-element"></div>
 
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {showSettings && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="gufeng-card p-8 w-full max-w-md"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-800/10 rounded-2xl flex items-center justify-center">
-                    <Settings size={20} className="text-red-800" />
-                  </div>
-                  <h2 className="text-3xl font-black font-serif tracking-[0.2em] text-stone-950">工坊设置</h2>
-                </div>
-                <button onClick={() => setShowSettings(false)} className="p-2.5 hover:bg-black/5 rounded-full transition-all hover:rotate-90 duration-500">
-                  <X size={24} className="text-stone-800" />
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <label className="text-lg font-black text-stone-950 font-serif tracking-wider">生成模型</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      onClick={() => setSelectedModel('free')}
-                      className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'free' ? 'active' : 'bg-stone-200/60'}`}
-                    >
-                      <span className="font-bold">标准画卷</span>
-                      <span className="text-[10px] opacity-60">Gemini 2.5 Flash</span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedModel('paid')}
-                      className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'paid' ? 'active' : 'bg-stone-200/60'}`}
-                    >
-                      <span className="font-bold">极清画卷</span>
-                      <span className="text-[10px] opacity-60">Gemini 3.1 Flash</span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedModel('wanxiang')}
-                      className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'wanxiang' ? 'active' : 'bg-stone-200/60'}`}
-                    >
-                      <span className="font-bold">万象画卷</span>
-                      <span className="text-[10px] opacity-60">wan2.6-t2i</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-lg font-black text-stone-950 font-serif tracking-wider">书法字体</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      onClick={() => setSelectedFont('font-calligraphy')}
-                      className={`gufeng-button py-3 text-sm ${selectedFont === 'font-calligraphy' ? 'active' : 'bg-stone-200/60'}`}
-                    >
-                      之芒星
-                    </button>
-                    <button
-                      onClick={() => setSelectedFont('font-brush')}
-                      className={`gufeng-button py-3 text-sm ${selectedFont === 'font-brush' ? 'active' : 'bg-stone-200/60'}`}
-                    >
-                      马善政
-                    </button>
-                    <button
-                      onClick={() => setSelectedFont('font-cursive')}
-                      className={`gufeng-button py-3 text-sm ${selectedFont === 'font-cursive' ? 'active' : 'bg-stone-200/60'}`}
-                    >
-                      龙藏体
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-lg font-black text-stone-950 font-serif tracking-wider">艺术风格</label>
-                  <div className="flex flex-wrap gap-2">
-                    {STYLES.map((style) => (
-                      <button
-                        key={style.id}
-                        onClick={() => setSelectedStyleId(style.id)}
-                        className={`gufeng-button text-sm ${selectedStyleId === style.id ? 'active' : 'bg-stone-200/60'}`}
-                      >
-                        {style.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowSettings(false)}
-                className="w-full mt-8 py-4 bg-red-800 text-white rounded-full font-bold text-lg hover:bg-red-900 shadow-xl shadow-red-900/20 transition-all active:scale-95"
-              >
-                保存设置
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SettingsModal
+        open={showSettings}
+        canClose={true}
+        settings={appSettings}
+        selectedModel={selectedModel}
+        selectedFont={selectedFont}
+        selectedStyleId={selectedStyleId}
+        styles={STYLES}
+        isSaving={isSettingsSaving}
+        onSettingsChange={handleSettingsChange}
+        onSelectModel={setSelectedModel}
+        onSelectFont={setSelectedFont}
+        onSelectStyle={setSelectedStyleId}
+        onClose={() => setShowSettings(false)}
+        onSave={handleSaveSettings}
+      />
 
       {/* Left Sidebar: Controls */}
       <div className="w-[480px] flex flex-col gap-6 h-full">
