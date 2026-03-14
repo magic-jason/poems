@@ -4,7 +4,7 @@ import { Sparkles, Image as ImageIcon, BookOpen, Loader2, Search, Key, Settings,
 import CanvasOverlay from './components/CanvasOverlay';
 import SettingsModal, { shouldOpenSettingsGate } from './components/SettingsModal';
 import { analyzePoem, generateImage, PoemAnalysis } from './services/gemini';
-import { type AppSettings, isAppConfiguredForUse, isDesktopRuntime, isSettingsSatisfiedForModel, loadSettings, normalizeModelType, saveSettings } from './services/desktop';
+import { extractErrorMessage, type AppSettings, isAppConfiguredForUse, isDesktopRuntime, isSettingsSatisfiedForModel, loadSettings, normalizeModelType, saveSettings } from './services/desktop';
 import { StudyCard } from './components/StudyCard';
 import { toPng } from 'html-to-image';
 
@@ -603,9 +603,9 @@ export default function App() {
           styleId: selectedStyleId
         }
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || "生成失败，请稍后重试。");
+      setError(extractErrorMessage(err));
     } finally {
       setIsGenerating(false);
     }

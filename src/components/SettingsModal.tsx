@@ -90,7 +90,7 @@ export default function SettingsModal({
                   placeholder="用于 Gemini 解析与 Gemini 出图"
                   className="w-full rounded-2xl border border-stone-300/80 bg-white/80 px-4 py-3 text-stone-900 outline-none transition focus:border-red-700 focus:ring-2 focus:ring-red-200"
                 />
-                <p className="text-xs text-stone-500 leading-relaxed">选择“标准画卷 / 极清画卷”时需要填写。</p>
+                <p className="text-xs text-stone-500 leading-relaxed">选择“标准画卷”时需要填写。</p>
               </div>
 
               <div className="space-y-3">
@@ -107,20 +107,13 @@ export default function SettingsModal({
 
               <div className="space-y-3">
                 <label className="text-lg font-black text-stone-950 font-serif tracking-wider">生成模型</label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => onSelectModel('free')}
                     className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'free' ? 'active' : 'bg-stone-200/60'}`}
                   >
                     <span className="font-bold">标准画卷</span>
                     <span className="text-[10px] opacity-60">Gemini 2.5 Flash</span>
-                  </button>
-                  <button
-                    onClick={() => onSelectModel('paid')}
-                    className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'paid' ? 'active' : 'bg-stone-200/60'}`}
-                  >
-                    <span className="font-bold">极清画卷</span>
-                    <span className="text-[10px] opacity-60">Gemini 3.1 Flash</span>
                   </button>
                   <button
                     onClick={() => onSelectModel('wanxiang')}

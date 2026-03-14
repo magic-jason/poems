@@ -4,7 +4,6 @@ use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
 const DASHSCOPE_API_BASE: &str = "https://dashscope.aliyuncs.com/api";
-const DASHSCOPE_CHAT_COMPLETIONS_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 const DASHSCOPE_TEXT_MODEL: &str = "qwen-plus";
 const NEGATIVE_PROMPT: &str = "文字, 书法, 诗句, 印章, 签名, 卷轴, 书本, 纸张, 字幕, 水印, letters, text, writing, watermark, signature, calligraphy, scroll, paper texture with writing";
 
@@ -29,32 +28,76 @@ pub fn build_dashscope_payload(prompt: &str) -> Value {
     })
 }
 
+fn poem_analysis_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "analysis": { "type": "string" },
+            "authorIntro": { "type": "string" },
+            "imagePrompt": { "type": "string" },
+            "pinyinData": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "char": { "type": "string" },
+                        "pinyin": { "type": "string" }
+                    },
+                    "required": ["char", "pinyin"]
+                }
+            },
+            "vocabulary": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "word": { "type": "string" },
+                        "explanation": { "type": "string" }
+                    },
+                    "required": ["word", "explanation"]
+                }
+            }
+        },
+        "required": ["analysis", "authorIntro", "imagePrompt", "pinyinData", "vocabulary"]
+    })
+}
+
 pub fn build_dashscope_analysis_payload(request: &AnalyzePoemRequest) -> Value {
-    let prompt = format!(
-        "{}\n\n请务必只返回 JSON 对象（JSON），不要输出 Markdown、解释或多余文字。",
-        gemini::build_analysis_prompt(
-            &request.title,
-            &request.author,
-            &request.content,
-            &request.style_name,
-            &request.style_prompt,
-        )
+    let prompt = gemini::build_analysis_prompt(
+        &request.title,
+        &request.author,
+        &request.content,
+        &request.style_name,
+        &request.style_prompt,
     );
 
     json!({
         "model": DASHSCOPE_TEXT_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": "你是一位精通中华传统文化的诗画大宗师。请严格遵守要求，只输出 JSON 对象。"
-            },
-            {
-                "role": "user",
-                "content": prompt
+        "input": {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "你是一位精通中华传统文化的诗画大宗师。请严格遵守要求，只输出符合 schema 的 JSON 对象。"
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        },
+        "parameters": {
+            "result_format": "message",
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "poem_analysis",
+                    "strict": true,
+                    "schema": poem_analysis_schema()
+                }
             }
-        ],
-        "response_format": {
-            "type": "json_object"
         }
     })
 }
@@ -80,8 +123,12 @@ pub async fn analyze_poem(request: AnalyzePoemRequest) -> Result<PoemAnalysis, S
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| "未配置 DashScope API Key，请先在设置中填写。".to_string())?;
 
+    let url = format!(
+        "{}/v1/services/aigc/text-generation/generation",
+        DASHSCOPE_API_BASE
+    );
     let response = reqwest::Client::new()
-        .post(DASHSCOPE_CHAT_COMPLETIONS_URL)
+        .post(url)
         .bearer_auth(&api_key)
         .json(&build_dashscope_analysis_payload(&request))
         .send()
@@ -98,12 +145,12 @@ pub async fn analyze_poem(request: AnalyzePoemRequest) -> Result<PoemAnalysis, S
         .await
         .map_err(|error| format!("DashScope 解析响应失败：{error}"))?;
     let text = body
-        .pointer("/choices/0/message/content")
+        .pointer("/output/choices/0/message/content")
         .and_then(Value::as_str)
-        .ok_or_else(|| "DashScope 未返回可解析的文本结果。".to_string())?;
+        .ok_or_else(|| format!("DashScope 未返回可解析的文本结果：{}", summarize_error(&body.to_string())))?;
 
     serde_json::from_str::<PoemAnalysis>(text)
-        .map_err(|error| format!("解析 DashScope 结果 JSON 失败：{error}"))
+        .map_err(|error| format!("解析 DashScope 结果 JSON 失败：{error}；原始内容：{}", summarize_error(text)))
 }
 
 pub async fn generate_image(prompt: &str) -> Result<String, String> {
@@ -251,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_dashscope_analysis_payload_with_json_output() {
+    fn builds_dashscope_analysis_payload_with_json_schema() {
         let payload = build_dashscope_analysis_payload(&AnalyzePoemRequest {
             title: "静夜思".into(),
             author: "李白".into(),
@@ -263,8 +310,11 @@ mod tests {
         let text = serde_json::to_string(&payload).unwrap();
 
         assert!(text.contains("qwen-plus"));
-        assert!(text.contains("json_object"));
-        assert!(text.contains("JSON"));
+        assert!(text.contains("json_schema"));
+        assert!(text.contains("strict"));
+        assert!(text.contains("additionalProperties"));
+        assert!(text.contains("analysis"));
+        assert!(text.contains("authorIntro"));
         assert!(text.contains("静夜思"));
     }
 }

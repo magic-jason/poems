@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  extractErrorMessage,
   getRequiredKeyForModel,
   normalizeModelType,
   isAppConfiguredForUse,
@@ -63,8 +64,15 @@ test('gemini modes only require gemini key', () => {
   );
 });
 
-test('normalizeModelType defaults to wanxiang', () => {
+test('normalizeModelType hides paid model behind free', () => {
   assert.equal(normalizeModelType(undefined), 'wanxiang');
-  assert.equal(normalizeModelType('paid'), 'paid');
+  assert.equal(normalizeModelType('paid'), 'free');
   assert.equal(normalizeModelType('unknown'), 'wanxiang');
+});
+
+test('extractErrorMessage preserves string and object messages', () => {
+  assert.equal(extractErrorMessage('DashScope 解析失败：bad json'), 'DashScope 解析失败：bad json');
+  assert.equal(extractErrorMessage(new Error('network timeout')), 'network timeout');
+  assert.equal(extractErrorMessage({ message: 'tauri invoke failed' }), 'tauri invoke failed');
+  assert.equal(extractErrorMessage({ reason: 'x' }, 'fallback'), 'fallback');
 });

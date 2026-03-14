@@ -27,7 +27,15 @@ export function normalizeSettings(input: RawSettings = {}): AppSettings {
 }
 
 export function normalizeModelType(modelType?: string | null): ModelType {
-  return modelType === 'free' || modelType === 'paid' || modelType === 'wanxiang' ? modelType : 'wanxiang';
+  if (modelType === 'free' || modelType === 'wanxiang') {
+    return modelType;
+  }
+
+  if (modelType === 'paid') {
+    return 'free';
+  }
+
+  return 'wanxiang';
 }
 
 export function getRequiredKeyForModel(modelType: ModelType): RequiredKey {
@@ -61,6 +69,25 @@ export function isAppConfiguredForUse(
 
 export function isDesktopRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+export function extractErrorMessage(error: unknown, fallback = '生成失败，请稍后重试。'): string {
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
 }
 
 async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
