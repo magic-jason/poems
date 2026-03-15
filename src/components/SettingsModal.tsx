@@ -70,7 +70,7 @@ export default function SettingsModal({
                 </div>
                 <div>
                   <h2 className="text-3xl font-black font-serif tracking-[0.2em] text-stone-950">工坊设置</h2>
-                  <p className="text-sm text-stone-500 mt-1">按当前模型填写对应密钥即可开始；国内环境推荐先使用万相模式。</p>
+                  <p className="text-sm text-stone-500 mt-1">按当前模型填写对应密钥即可开始；国内环境推荐先使用国内版。</p>
                 </div>
               </div>
               {canClose && (
@@ -87,10 +87,10 @@ export default function SettingsModal({
                   value={settings.geminiApiKey}
                   onChange={(event) => onSettingsChange({ geminiApiKey: event.target.value })}
                   type="password"
-                  placeholder="用于 Gemini 解析与 Gemini 出图"
+                  placeholder="用于国际版解析与国际版出图"
                   className="w-full rounded-2xl border border-stone-300/80 bg-white/80 px-4 py-3 text-stone-900 outline-none transition focus:border-red-700 focus:ring-2 focus:ring-red-200"
                 />
-                <p className="text-xs text-stone-500 leading-relaxed">选择“标准画卷”时需要填写。</p>
+                <p className="text-xs text-stone-500 leading-relaxed">选择“国际版”时需要填写。</p>
               </div>
 
               <div className="space-y-3">
@@ -99,10 +99,10 @@ export default function SettingsModal({
                   value={settings.dashscopeApiKey}
                   onChange={(event) => onSettingsChange({ dashscopeApiKey: event.target.value })}
                   type="password"
-                  placeholder="用于万相解析与万相画卷"
+                  placeholder="用于国内版解析与国内版出图"
                   className="w-full rounded-2xl border border-stone-300/80 bg-white/80 px-4 py-3 text-stone-900 outline-none transition focus:border-red-700 focus:ring-2 focus:ring-red-200"
                 />
-                <p className="text-xs text-stone-500 leading-relaxed">选择“万象画卷”时只需填写这一项。</p>
+                <p className="text-xs text-stone-500 leading-relaxed">选择“国内版”时只需填写这一项。</p>
               </div>
 
               <div className="space-y-3">
@@ -112,14 +112,14 @@ export default function SettingsModal({
                     onClick={() => onSelectModel('free')}
                     className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'free' ? 'active' : 'bg-stone-200/60'}`}
                   >
-                    <span className="font-bold">标准画卷</span>
+                    <span className="font-bold">国际版</span>
                     <span className="text-[10px] opacity-60">Gemini 2.5 Flash</span>
                   </button>
                   <button
                     onClick={() => onSelectModel('wanxiang')}
                     className={`gufeng-button py-4 text-sm flex flex-col items-center gap-1 ${selectedModel === 'wanxiang' ? 'active' : 'bg-stone-200/60'}`}
                   >
-                    <span className="font-bold">万象画卷</span>
+                    <span className="font-bold">国内版</span>
                     <span className="text-[10px] opacity-60">wan2.6-t2i</span>
                   </button>
                 </div>
