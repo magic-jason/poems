@@ -1,6 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { analyzePoemDesktop, generateImageDesktop, isDesktopRuntime, type ModelType } from "./desktop";
 
+const DASHSCOPE_PRIMARY_ANALYSIS_MODEL = 'qwen-plus';
+const DASHSCOPE_FALLBACK_ANALYSIS_MODEL = 'qwen3-max';
+const DASHSCOPE_ANALYSIS_URL = '/dashscope-api/v1/services/aigc/text-generation/generation';
+const DASHSCOPE_IMAGE_URL = '/dashscope-api/v1/services/aigc/multimodal-generation/generation';
+const DASHSCOPE_ASYNC_IMAGE_URL = '/dashscope-api/v1/services/aigc/text2image/image-synthesis';
+const NEGATIVE_PROMPT = '文字, 书法, 诗句, 印章, 签名, 卷轴, 书本, 纸张, 字幕, 水印, letters, text, writing, watermark, signature, calligraphy, scroll, paper texture with writing';
+
 export interface PoemAnalysis {
   analysis: string;
   authorIntro: string;
@@ -9,13 +16,51 @@ export interface PoemAnalysis {
   vocabulary: Array<{ word: string; explanation: string }>;
 }
 
-async function analyzePoemWeb(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
-  const ai = new GoogleGenAI({ apiKey: apiKey as string });
+interface DashscopeAnalysisRequest {
+  model: string;
+  input: {
+    messages: Array<{
+      role: string;
+      content: string;
+    }>;
+  };
+  parameters: {
+    result_format: string;
+    response_format: {
+      type: string;
+      json_schema: {
+        name: string;
+        strict: boolean;
+        schema: object;
+      };
+    };
+  };
+}
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `你是一位精通中华传统文化的“诗画大宗师”。
+interface DashscopeAnalysisError {
+  model: string;
+  statusCode?: number;
+  message: string;
+}
+
+function getGeminiApiKey(): string {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('未配置 Gemini API Key。');
+  }
+  return apiKey;
+}
+
+function getDashscopeApiKey(): string {
+  const apiKey = import.meta.env.VITE_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY;
+  if (!apiKey) {
+    throw new Error('未配置阿里云百炼 API Key（VITE_DASHSCOPE_API_KEY）。');
+  }
+  return apiKey;
+}
+
+function buildAnalysisPrompt(title: string, author: string, content: string, styleName: string, stylePrompt: string): string {
+  return `你是一位精通中华传统文化的“诗画大宗师”。
 请根据以下古诗词和艺术风格，完成诗意解析、作者介绍、疑难词汇解释，提供用于AI图像生成的英文Prompt，并将原诗正文转换为带拼音的数据结构。
 
 古诗词（标题与作者）：《${title}》 ${author}
@@ -54,9 +99,134 @@ ${content}
   "vocabulary": [
     {"word": "明月", "explanation": "明亮的月亮。"}
   ]
-}`,
+}`;
+}
+
+function buildPoemAnalysisSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      analysis: { type: 'string' },
+      authorIntro: { type: 'string' },
+      imagePrompt: { type: 'string' },
+      pinyinData: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            char: { type: 'string' },
+            pinyin: { type: 'string' },
+          },
+          required: ['char', 'pinyin'],
+        },
+      },
+      vocabulary: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            word: { type: 'string' },
+            explanation: { type: 'string' },
+          },
+          required: ['word', 'explanation'],
+        },
+      },
+    },
+    required: ['analysis', 'authorIntro', 'imagePrompt', 'pinyinData', 'vocabulary'],
+  };
+}
+
+export function buildDashscopeAnalysisRequest(
+  title: string,
+  author: string,
+  content: string,
+  styleName: string,
+  stylePrompt: string,
+  model: string = DASHSCOPE_PRIMARY_ANALYSIS_MODEL,
+): DashscopeAnalysisRequest {
+  return {
+    model,
+    input: {
+      messages: [
+        {
+          role: 'system',
+          content: '你是一位精通中华传统文化的诗画大宗师。请严格遵守要求，只输出符合 schema 的 JSON 对象。',
+        },
+        {
+          role: 'user',
+          content: buildAnalysisPrompt(title, author, content, styleName, stylePrompt),
+        },
+      ],
+    },
+    parameters: {
+      result_format: 'message',
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'poem_analysis',
+          strict: true,
+          schema: buildPoemAnalysisSchema(),
+        },
+      },
+    },
+  };
+}
+
+export function shouldFallbackDashscopeAnalysis(statusCode?: number, details: string = ''): boolean {
+  if (statusCode === 401) {
+    return false;
+  }
+
+  if (statusCode === 429 || statusCode === 503 || statusCode === 504) {
+    return true;
+  }
+
+  const normalized = details.toLowerCase();
+  return [
+    'quota',
+    'insufficient',
+    'rate limit',
+    'too many requests',
+    'throttl',
+    'resource exhausted',
+    'model not available',
+    'modelnotfound',
+    'unavailable',
+    'service unavailable',
+    'temporarily unavailable',
+  ].some(keyword => normalized.includes(keyword))
+    || details.includes('额度')
+    || details.includes('余额')
+    || details.includes('欠费')
+    || details.includes('限流')
+    || details.includes('不可用')
+    || details.includes('无可用');
+}
+
+function summarizeError(details: string): string {
+  const trimmed = details.trim();
+  return trimmed ? trimmed.slice(0, 240) : '接口未返回详细错误信息。';
+}
+
+function extractDashscopeAnalysisText(body: any): string {
+  const text = body?.output?.choices?.[0]?.message?.content;
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error(`DashScope 未返回可解析的文本结果：${summarizeError(JSON.stringify(body))}`);
+  }
+  return text;
+}
+
+async function analyzePoemGeminiWeb(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: buildAnalysisPrompt(title, author, content, styleName, stylePrompt),
     config: {
-      responseMimeType: "application/json",
+      responseMimeType: 'application/json',
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -71,7 +241,7 @@ ${content}
                 char: { type: Type.STRING },
                 pinyin: { type: Type.STRING }
               },
-              required: ["char", "pinyin"]
+              required: ['char', 'pinyin']
             }
           },
           vocabulary: {
@@ -82,25 +252,107 @@ ${content}
                 word: { type: Type.STRING },
                 explanation: { type: Type.STRING }
               },
-              required: ["word", "explanation"]
+              required: ['word', 'explanation']
             }
           }
         },
-        required: ["analysis", "authorIntro", "imagePrompt", "pinyinData", "vocabulary"]
+        required: ['analysis', 'authorIntro', 'imagePrompt', 'pinyinData', 'vocabulary']
       }
     }
   });
 
   if (!response.text) {
-    throw new Error("Failed to generate analysis.");
+    throw new Error('Failed to generate analysis.');
   }
 
   return JSON.parse(response.text);
 }
 
-/**
- * Helper to fetch image from URL and convert to Base64 via local proxy
- */
+async function analyzePoemDashscopeWithModel(
+  title: string,
+  author: string,
+  content: string,
+  styleName: string,
+  stylePrompt: string,
+  model: string,
+  apiKey: string,
+): Promise<PoemAnalysis> {
+  const response = await fetch(DASHSCOPE_ANALYSIS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(buildDashscopeAnalysisRequest(title, author, content, styleName, stylePrompt, model)),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    const error: DashscopeAnalysisError = {
+      model,
+      statusCode: response.status,
+      message: `HTTP ${response.status}：${summarizeError(details)}`,
+    };
+    throw error;
+  }
+
+  let body: any;
+  try {
+    body = await response.json();
+  } catch (error) {
+    const dashscopeError: DashscopeAnalysisError = {
+      model,
+      message: `响应解析失败：${error}`,
+    };
+    throw dashscopeError;
+  }
+
+  try {
+    return JSON.parse(extractDashscopeAnalysisText(body));
+  } catch (error) {
+    const dashscopeError: DashscopeAnalysisError = {
+      model,
+      message: error instanceof Error ? error.message : String(error),
+    };
+    throw dashscopeError;
+  }
+}
+
+async function analyzePoemDashscopeWeb(title: string, author: string, content: string, styleName: string, stylePrompt: string): Promise<PoemAnalysis> {
+  const apiKey = getDashscopeApiKey();
+
+  try {
+    return await analyzePoemDashscopeWithModel(title, author, content, styleName, stylePrompt, DASHSCOPE_PRIMARY_ANALYSIS_MODEL, apiKey);
+  } catch (error) {
+    const primaryError = error as DashscopeAnalysisError;
+    if (!shouldFallbackDashscopeAnalysis(primaryError.statusCode, primaryError.message)) {
+      throw new Error(`${primaryError.model} 解析失败：${primaryError.message}`);
+    }
+
+    try {
+      return await analyzePoemDashscopeWithModel(title, author, content, styleName, stylePrompt, DASHSCOPE_FALLBACK_ANALYSIS_MODEL, apiKey);
+    } catch (fallbackError) {
+      const secondaryError = fallbackError as DashscopeAnalysisError;
+      throw new Error(`DashScope 解析失败：主模型 ${primaryError.model}：${primaryError.message}；备用模型 ${secondaryError.model}：${secondaryError.message}`);
+    }
+  }
+}
+
+async function analyzePoemWeb(
+  title: string,
+  author: string,
+  content: string,
+  styleName: string,
+  stylePrompt: string,
+  modelType: ModelType,
+): Promise<PoemAnalysis> {
+  if (modelType === 'wanxiang') {
+    return analyzePoemDashscopeWeb(title, author, content, styleName, stylePrompt);
+  }
+
+  return analyzePoemGeminiWeb(title, author, content, styleName, stylePrompt);
+}
+
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
   const proxiedUrl = `/image-proxy?url=${encodeURIComponent(imageUrl)}`;
   const imgResponse = await fetch(proxiedUrl);
@@ -116,14 +368,8 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
   });
 }
 
-/**
- * Wanxiang v2.5 Async Generation (Fallback)
- */
 async function generateImageWanxiangAsync(prompt: string, apiKey: string): Promise<string> {
-  const negativePrompt = "文字, 书法, 诗句, 印章, 签名, 卷轴, 书本, 纸张, 字幕, 水印, letters, text, writing, watermark, signature, calligraphy, scroll, paper texture with writing";
-  
-  // 1. Create Task
-  const createResponse = await fetch('/dashscope-api/v1/services/aigc/text2image/image-synthesis', {
+  const createResponse = await fetch(DASHSCOPE_ASYNC_IMAGE_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -131,9 +377,9 @@ async function generateImageWanxiangAsync(prompt: string, apiKey: string): Promi
       'X-DashScope-Async': 'enable'
     },
     body: JSON.stringify({
-      model: "wan2.5-t2i-preview",
+      model: 'wan2.5-t2i-preview',
       input: { prompt: `${prompt}. Traditional Chinese style, pure visual scene.` },
-      parameters: { size: "1280*720", n: 1, negative_prompt: negativePrompt }
+      parameters: { size: '1280*720', n: 1, negative_prompt: NEGATIVE_PROMPT }
     }),
   });
 
@@ -143,54 +389,49 @@ async function generateImageWanxiangAsync(prompt: string, apiKey: string): Promi
 
   const createData = await createResponse.json();
   const taskId = createData.output?.task_id;
-  if (!taskId) throw new Error("未获取到任务 ID");
+  if (!taskId) throw new Error('未获取到任务 ID');
 
-  // 2. Poll Task
   let attempts = 0;
-  const maxAttempts = 30; // 30 * 2s = 60s
+  const maxAttempts = 30;
   while (attempts < maxAttempts) {
     await new Promise(r => setTimeout(r, 2000));
     const taskResponse = await fetch(`/dashscope-api/v1/tasks/${taskId}`, {
       headers: { 'Authorization': `Bearer ${apiKey}` }
     });
-    
-    if (!taskResponse.ok) throw new Error("轮询任务状态失败");
+
+    if (!taskResponse.ok) throw new Error('轮询任务状态失败');
     const taskData = await taskResponse.json();
     const status = taskData.output?.task_status;
 
     if (status === 'SUCCEEDED') {
       const url = taskData.output?.results?.[0]?.url;
-      if (!url) throw new Error("任务成功但未返回 URL");
+      if (!url) throw new Error('任务成功但未返回 URL');
       return fetchImageAsBase64(url);
-    } else if (status === 'FAILED') {
+    }
+    if (status === 'FAILED') {
       throw new Error(`生成失败: ${taskData.output?.message || '未知错误'}`);
     }
     attempts++;
   }
-  throw new Error("生成超时（60秒）");
+  throw new Error('生成超时（60秒）');
 }
 
 async function generateImageWanxiangWeb(prompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY;
-  if (!apiKey) {
-    throw new Error("未配置阿里云百炼 API Key（VITE_DASHSCOPE_API_KEY）。");
-  }
+  const apiKey = getDashscopeApiKey();
 
   try {
-    // Attempt wan2.6 Synchronous call first
-    const negativePrompt = "文字, 书法, 诗句, 印章, 签名, 卷轴, 书本, 纸张, 字幕, 水印, letters, text, writing, watermark, signature, calligraphy, scroll, paper texture with writing";
     const requestBody = {
-      model: "wan2.6-t2i",
+      model: 'wan2.6-t2i',
       input: {
         messages: [{
-          role: "user",
+          role: 'user',
           content: [{ text: `${prompt}. Traditional Chinese style, all elements (people, clothing, architecture) must be traditional Chinese. Pure visual scene with absolutely zero text elements.` }]
         }]
       },
-      parameters: { prompt_extend: true, watermark: false, n: 1, negative_prompt: negativePrompt, size: "1696*960" }
+      parameters: { prompt_extend: true, watermark: false, n: 1, negative_prompt: NEGATIVE_PROMPT, size: '1696*960' }
     };
 
-    const response = await fetch('/dashscope-api/v1/services/aigc/multimodal-generation/generation', {
+    const response = await fetch(DASHSCOPE_IMAGE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(requestBody),
@@ -203,29 +444,22 @@ async function generateImageWanxiangWeb(prompt: string): Promise<string> {
         if (imageUrl) return fetchImageAsBase64(imageUrl);
       }
     }
-    console.warn("wan2.6 调用失败或额度不足，尝试降级到 wan2.5...");
-  } catch (e) {
-    console.warn("wan2.6 请求异常:", e);
+    console.warn('wan2.6 调用失败或额度不足，尝试降级到 wan2.5...');
+  } catch (error) {
+    console.warn('wan2.6 请求异常:', error);
   }
 
-  // Fallback to wan2.5 Async
   return generateImageWanxiangAsync(prompt, apiKey);
 }
 
 async function generateImageWeb(prompt: string, modelType: 'free' | 'paid' | 'wanxiang'): Promise<string> {
-
-  // Delegate to wanxiang model if selected
   if (modelType === 'wanxiang') {
     return generateImageWanxiangWeb(prompt);
   }
 
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
-  const ai = new GoogleGenAI({ apiKey: apiKey as string });
-
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
   const modelName = modelType === 'paid' ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
 
-
-  // Force no text and Chinese elements in the image prompt
   const finalPrompt = `STRICT NEGATIVE CONSTRAINTS (CRITICAL):
   - ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO CHARACTERS, NO WRITING, NO ALPHABET.
   - NO CHINESE CHARACTERS, NO CALLIGRAPHY, NO POEM TEXT, NO INSCRIPTIONS, NO KANJI, NO HANZI.
@@ -256,14 +490,14 @@ async function generateImageWeb(prompt: string, modelType: 'free' | 'paid' | 'wa
     },
     config: {
       imageConfig: {
-        aspectRatio: "16:9",
-        ...(modelType === 'paid' ? { imageSize: "2K" } : {})
+        aspectRatio: '16:9',
+        ...(modelType === 'paid' ? { imageSize: '2K' } : {})
       }
     }
   });
 
-  let base64Image = "";
-  if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+  let base64Image = '';
+  if (response.candidates?.[0]?.content?.parts) {
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData) {
         base64Image = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -273,19 +507,18 @@ async function generateImageWeb(prompt: string, modelType: 'free' | 'paid' | 'wa
   }
 
   if (!base64Image) {
-    throw new Error("Failed to generate image.");
+    throw new Error('Failed to generate image.');
   }
 
   return base64Image;
 }
-
 
 export async function analyzePoem(title: string, author: string, content: string, styleName: string, stylePrompt: string, modelType: ModelType): Promise<PoemAnalysis> {
   if (isDesktopRuntime()) {
     return analyzePoemDesktop(title, author, content, styleName, stylePrompt, modelType);
   }
 
-  return analyzePoemWeb(title, author, content, styleName, stylePrompt);
+  return analyzePoemWeb(title, author, content, styleName, stylePrompt, modelType);
 }
 
 export async function generateImage(prompt: string, modelType: ModelType): Promise<string> {

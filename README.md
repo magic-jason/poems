@@ -6,14 +6,47 @@
 
 一个以 `React + Vite + Tauri` 构建的古诗词诗画生成桌面应用。
 
+## EXE 同源 Web 验证环境（推荐）
+
+这个 worktree：
+`/Users/triplej/Documents/temp/poetry-painting-master/.worktrees/windows-portable-tauri`
+就是当前 Windows 绿色版 EXE 的功能真源。
+
+### 常用命令
+
+- 本地 parity Web：`npm run dev:parity`
+- parity 测试：`npm run test:parity`
+- parity 类型检查：`npm run lint:parity`
+- parity 构建：`npm run build:parity`
+
+### 固定地址
+
+- `http://127.0.0.1:3001`
+
+### 推荐流程
+
+1. 先在这个 worktree 中完成功能修改
+2. 运行 `npm run dev:parity`
+3. 在浏览器中验证首启配置、标准画卷、万象画卷、失败兜底等主链路
+4. 运行 `npm run test:parity` 和 `npm run lint:parity`
+5. 验证通过后，再触发 GitHub Actions 打 Windows 绿色包
+
+### 密钥说明
+
+- 浏览器 parity 模式下，如需直接调用模型，请在当前 worktree 的 `.env.local` 中配置：
+  - `VITE_GEMINI_API_KEY=...`
+  - `VITE_DASHSCOPE_API_KEY=...`
+- Tauri 桌面版仍然优先使用应用内保存的设置，不依赖浏览器模式的 `.env.local`
+
 ## 本地开发
 
 **Prerequisites:** Node.js、Rust（用于 Tauri）
 
 1. 安装依赖：`npm install`
-2. 本地网页模式调试：`npm run dev`
-3. 类型检查：`npm run lint`
-4. Tauri 桌面调试：`npx tauri dev`
+2. 旧端口网页模式调试：`npm run dev`
+3. EXE 同源网页模式调试：`npm run dev:parity`
+4. 类型检查：`npm run lint`
+5. Tauri 桌面调试：`npx tauri dev`
 
 ## GitHub Actions 打 Windows 绿色包
 
