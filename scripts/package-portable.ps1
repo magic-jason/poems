@@ -16,13 +16,27 @@ try {
   }
   New-Item -ItemType Directory -Path $appDir -Force | Out-Null
 
-  $exe = Get-ChildItem $releaseDir -Filter '*.exe' |
-    Where-Object { $_.Name -notmatch 'build-script' } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+  $preferredExe = Join-Path $releaseDir 'app.exe'
+  if (Test-Path $preferredExe) {
+    $exe = Get-Item $preferredExe
+  }
+  else {
+    $exeCandidates = Get-ChildItem $releaseDir -Filter '*.exe' |
+      Where-Object {
+        $_.Name -notmatch 'build-script' -and
+        $_.BaseName -notmatch 'probe'
+      }
 
-  if (-not $exe) {
-    throw "未在 $releaseDir 找到可执行文件，请先在 Windows 上成功完成 Tauri release 构建。"
+    if ($exeCandidates.Count -eq 1) {
+      $exe = $exeCandidates[0]
+    }
+    elseif ($exeCandidates.Count -gt 1) {
+      $candidateNames = ($exeCandidates | ForEach-Object { $_.Name }) -join ', '
+      throw "在 $releaseDir 找到多个候选可执行文件：$candidateNames。请明确指定主程序 exe。"
+    }
+    else {
+      throw "未在 $releaseDir 找到主程序 exe（已排除 build-script 和 probe 二进制）。"
+    }
   }
 
   Copy-Item $exe.FullName (Join-Path $appDir '墨韵灵笔.exe') -Force
