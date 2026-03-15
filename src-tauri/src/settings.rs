@@ -36,13 +36,13 @@ pub fn load_settings_at(root: &Path) -> io::Result<AppSettings> {
     let settings = serde_json::from_str::<AppSettings>(&contents)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
-    Ok(settings)
+    Ok(normalize_settings(settings))
 }
 
 pub fn save_settings_at(root: &Path, settings: &AppSettings) -> io::Result<()> {
     fs::create_dir_all(root)?;
     let path = settings_file_path(root);
-    let contents = serde_json::to_string_pretty(settings)
+    let contents = serde_json::to_string_pretty(&normalize_settings(settings.clone()))
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     fs::write(path, contents)
 }
@@ -60,6 +60,26 @@ fn settings_dir() -> io::Result<PathBuf> {
 
 fn settings_file_path(root: &Path) -> PathBuf {
     root.join(SETTINGS_FILE_NAME)
+}
+
+fn normalize_settings(settings: AppSettings) -> AppSettings {
+    AppSettings {
+        gemini_api_key: normalize_optional_value(settings.gemini_api_key),
+        dashscope_api_key: normalize_optional_value(settings.dashscope_api_key),
+        last_model_type: normalize_optional_value(settings.last_model_type),
+        last_used_style: normalize_optional_value(settings.last_used_style),
+    }
+}
+
+fn normalize_optional_value(value: Option<String>) -> Option<String> {
+    value.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
 }
 
 #[cfg(test)]
@@ -93,6 +113,31 @@ mod tests {
         assert_eq!(loaded.gemini_api_key.as_deref(), Some("g-key"));
         assert_eq!(loaded.dashscope_api_key.as_deref(), Some("d-key"));
         assert_eq!(loaded.last_model_type.as_deref(), Some("free"));
+        assert_eq!(loaded.last_used_style.as_deref(), Some("水墨淡彩"));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn loads_settings_with_trimmed_values() {
+        let root = test_root("settings-trimmed");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("config.json"),
+            r#"{
+  "geminiApiKey": "  g-key  \n",
+  "dashscopeApiKey": "\t d-key \r\n",
+  "lastModelType": " wanxiang ",
+  "lastUsedStyle": " 水墨淡彩 "
+}"#,
+        )
+        .unwrap();
+
+        let loaded = load_settings_at(Path::new(&root)).unwrap();
+
+        assert_eq!(loaded.gemini_api_key.as_deref(), Some("g-key"));
+        assert_eq!(loaded.dashscope_api_key.as_deref(), Some("d-key"));
+        assert_eq!(loaded.last_model_type.as_deref(), Some("wanxiang"));
         assert_eq!(loaded.last_used_style.as_deref(), Some("水墨淡彩"));
 
         fs::remove_dir_all(root).unwrap();
