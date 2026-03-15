@@ -42,6 +42,7 @@ function ossImageProxyPlugin(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const hmrPort = mode === 'parity' ? 1422 : 1421;
   return {
     clearScreen: false,
     base: './',
@@ -62,7 +63,7 @@ export default defineConfig(({ mode }) => {
       hmr: process.env.DISABLE_HMR !== 'true' ? {
         protocol: 'ws',
         host: 'localhost',
-        port: 1421,
+        port: hmrPort,
       } : false,
       proxy: {
         '/dashscope-api': {

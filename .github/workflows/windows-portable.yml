@@ -1,0 +1,99 @@
+name: Windows Portable Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/windows-portable-tauri
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: windows-portable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-portable:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Type check frontend
+        run: npm run lint
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build portable package
+        run: npm run package:portable
+
+      - name: Upload portable artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: poetry-painting-win-x64-portable
+          path: |
+            dist-portable/poetry-painting-win-x64-portable.zip
+            dist-portable/墨韵灵笔/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Capture release metadata
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/codex/windows-portable-tauri'
+        run: |
+          $EOF = (New-Guid).Guid
+          "PORTABLE_RELEASE_BODY<<$EOF" >> $env:GITHUB_ENV
+          "自动更新的 Windows 绿色版测试包。" >> $env:GITHUB_ENV
+          "" >> $env:GITHUB_ENV
+          "- Branch: ${{ github.ref_name }}" >> $env:GITHUB_ENV
+          "- Commit: ${{ github.sha }}" >> $env:GITHUB_ENV
+          "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $env:GITHUB_ENV
+          "- Built at (UTC): $(Get-Date -AsUTC -Format 'yyyy-MM-dd HH:mm:ss UTC')" >> $env:GITHUB_ENV
+          "$EOF" >> $env:GITHUB_ENV
+
+      - name: Force update latest portable tag
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/codex/windows-portable-tauri'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest-portable ${{ github.sha }}
+          git push origin refs/tags/latest-portable --force
+
+      - name: Publish latest portable prerelease
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/codex/windows-portable-tauri'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-portable
+          name: Latest Portable Build
+          body: ${{ env.PORTABLE_RELEASE_BODY }}
+          prerelease: true
+          draft: false
+          files: dist-portable/poetry-painting-win-x64-portable.zip
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          make_latest: false
